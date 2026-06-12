@@ -4,6 +4,7 @@ import {
   Lock, Unlock, Users, Target, Shuffle, Settings, BookOpen, Undo2, AlertTriangle, Pencil, FlaskConical, Link2,
 } from "lucide-react";
 import { dbReady, sSet, sDel, sTx, subscribe, subscribeConnected } from "./db";
+import { syncBetsDraft } from "./betsDraft";
 
 /* ================= DATA — World Cup 2026 (final groups, post-playoffs) ================= */
 
@@ -883,9 +884,18 @@ function KoBets({ draft, setDraft, results, othersForKo }) {
 
 function MyBets({ me, config, results, betsAll, reach, onSaveBets }) {
   const saved = betsAll[me] || EMPTY_BETS;
-  const [draft, setDraft] = useState(saved);
+  const [draftState, setDraftState] = useState(() => ({ playerId: me, saved, draft: saved }));
   const [saving, setSaving] = useState(false);
-  useEffect(() => { setDraft(betsAll[me] || EMPTY_BETS); }, [me]); // eslint-disable-line
+  useEffect(() => {
+    setDraftState((current) => syncBetsDraft(current, me, saved));
+  }, [me, saved]);
+
+  const draft = draftState.draft;
+  const setDraft = (update) =>
+    setDraftState((current) => ({
+      ...current,
+      draft: typeof update === "function" ? update(current.draft) : update,
+    }));
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const locked = !!config?.locks?.bracket;
