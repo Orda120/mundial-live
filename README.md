@@ -72,3 +72,36 @@ npx firebase-tools deploy
 ## הערה למי שמגיע מגרסת ה־Claude Artifact
 
 האחסון נפרד — מקימים את הליגה פעם אחת מחדש באפליקציה (שחקנים, דראפט, הימורים).
+
+## Live score worker
+
+Group-stage scores are synchronized from ESPN by the Cloudflare Worker in
+`worker/`. The free Worker Cron runs every minute, but ESPN is queried only once
+every five minutes while a scheduled match may be active. The full schedule is
+refreshed twice per day.
+
+Production health check:
+
+```bash
+curl https://mundial-live-scores.ordahan120.workers.dev/health
+```
+
+Local validation:
+
+```bash
+npm test
+npm run build
+npm --prefix worker run check
+```
+
+Worker deployment requires `LEAGUE_ID` and `SYNC_TOKEN` as Cloudflare secrets.
+Do not put either value in Git. To inspect production logs after authenticating
+Wrangler:
+
+```bash
+npx --prefix worker wrangler tail mundial-live-scores
+```
+
+The existing administration score fields remain editable. Saving a score marks
+that fixture as a manual override, and the `MANUAL` action can return it to
+automatic ESPN updates without clearing the current score.

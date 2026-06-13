@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, get, set, remove, onValue, runTransaction } from "firebase/database";
+import { getDatabase, ref, get, set, update, remove, onValue, runTransaction } from "firebase/database";
 
 const cfg = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,6 +21,11 @@ export async function sGet(path) {
 export async function sSet(path, value) {
   if (!db) return false;
   await set(ref(db, path), value);
+  return true;
+}
+export async function sUpdate(path, value) {
+  if (!db) return false;
+  await update(ref(db, path), value);
   return true;
 }
 export async function sDel(path) {

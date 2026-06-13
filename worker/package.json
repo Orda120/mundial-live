@@ -1,0 +1,17 @@
+{
+  "name": "mundial-live-scores-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/*.test.js",
+    "types": "wrangler types",
+    "check": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.100.0"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
+  }
+}

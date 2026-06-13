@@ -17,16 +17,15 @@ A Cloudflare Worker on the free plan provides the server-side integration:
 
 - A Cron Trigger runs once per minute.
 - The Worker keeps the World Cup fixture schedule and API fixture identifiers.
-- It calls API-Football only when a match is within its polling window.
-- The API key is stored as a Cloudflare Worker secret and is never sent to the
-  browser or committed to Git.
+- It refreshes the ESPN World Cup schedule twice per day.
+- It calls ESPN's public scoreboard only when a match is within its polling
+  window.
 - The Worker writes normalized scores to the existing Firebase result paths.
 
-API-Football's free plan currently allows 100 requests per day. The Worker uses
-one request for all live World Cup fixtures, at most once every five minutes
-while at least one match may be active. A daily request counter reserves capacity
-for final-score checks and prevents exceeding the free quota. If the remaining
-budget becomes tight, polling automatically slows to once every 10 minutes.
+ESPN's scoreboard does not require an API key. The Worker requests all nearby
+World Cup fixtures at most once every five minutes while at least one match may
+be active. Outside match windows, the once-per-minute Cron invocation exits
+without calling ESPN.
 
 ## Polling Rules
 
@@ -42,9 +41,9 @@ For each scheduled match:
 6. If a match is delayed, suspended, or postponed, the Worker retains the last
    known score and continues only within a bounded extended window.
 
-The Worker records its last provider request and daily request count under the
-active league's `liveSync` Firebase path so overlapping Cron invocations do not
-consume duplicate API requests.
+The Worker records its last provider request under the active league's
+`liveSync` Firebase path so overlapping Cron invocations do not make duplicate
+requests.
 
 ## Fixture Mapping
 
@@ -72,7 +71,7 @@ Additional metadata is stored separately:
 
 ```text
 leagues/<leagueId>/liveMeta/g/<fixtureId> = {
-  source: "api-football" | "manual",
+  source: "espn" | "manual",
   status: "scheduled" | "live" | "finished" | "delayed" | "error",
   providerFixtureId: number,
   updatedAt: number,
@@ -116,13 +115,11 @@ manual overrides.
 
 - Provider request failure: keep the previous score and retry at the next
   eligible interval.
-- Daily quota exhausted: stop provider requests until the quota resets and keep
-  manual editing available.
 - Firebase write failure: record a Worker error and retry without changing the
   browser state.
 - Unknown or ambiguous fixture: skip the write.
-- Missing API credentials: the Worker reports configuration failure and the app
-  continues to work manually.
+- Missing Worker configuration: the Worker reports configuration failure and
+  the app continues to work manually.
 
 Automation never clears a known score because of an empty or failed provider
 response.
@@ -131,9 +128,9 @@ response.
 
 Cloudflare Worker configuration:
 
-- `API_FOOTBALL_KEY`: secret
 - `FIREBASE_DATABASE_URL`: environment variable
-- `LEAGUE_ID`: the current active league
+- `LEAGUE_ID`: secret containing the current active league
+- `SYNC_TOKEN`: secret protecting manual synchronization
 - Cron Trigger: every minute
 
 The Worker uses Firebase's REST endpoint for the active league. This is compatible
@@ -147,12 +144,10 @@ Automated tests cover:
 
 - Poll-window decisions before, during, and after matches.
 - Five-minute request throttling.
-- Daily quota budgeting and the 10-minute fallback interval.
 - Team and fixture mapping.
 - Live and final score normalization.
 - Manual overrides preventing automated writes.
 - Failed or empty provider responses preserving existing scores.
-- Quota exhaustion behavior.
 
 The app tests cover:
 

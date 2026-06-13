@@ -3,8 +3,16 @@ import {
   Trophy, RefreshCw, Check, X, Plus, Trash2, ChevronDown, ChevronLeft,
   Lock, Unlock, Users, Target, Shuffle, Settings, BookOpen, Undo2, AlertTriangle, Pencil, FlaskConical, Link2,
 } from "lucide-react";
-import { dbReady, sSet, sDel, sTx, subscribe, subscribeConnected } from "./db";
+import { dbReady, sSet, sUpdate, sDel, sTx, subscribe, subscribeConnected } from "./db";
 import { syncBetsDraft } from "./betsDraft";
+import { applyManualOverrides, clearManualOverride } from "./liveResults";
+import {
+  ALL_GROUP_FIXTURES,
+  ALL_TEAMS,
+  GROUP_KEYS,
+  GROUPS,
+  groupFixtures,
+} from "./worldCupData";
 
 /* ================= DATA — World Cup 2026 (final groups, post-playoffs) ================= */
 
@@ -22,20 +30,6 @@ const T = {
   POR: ["פורטוגל", "🇵🇹"], COD: ["קונגו", "🇨🇩"], UZB: ["אוזבקיסטן", "🇺🇿"], COL: ["קולומביה", "🇨🇴"],
   ENG: ["אנגליה", "🏴󠁧󠁢󠁥󠁮󠁧󠁿"], CRO: ["קרואטיה", "🇭🇷"], GHA: ["גאנה", "🇬🇭"], PAN: ["פנמה", "🇵🇦"],
 };
-
-const GROUPS = {
-  A: ["MEX", "KOR", "CZE", "RSA"], B: ["SUI", "CAN", "QAT", "BIH"], C: ["BRA", "MAR", "HAI", "SCO"],
-  D: ["USA", "TUR", "AUS", "PAR"], E: ["GER", "ECU", "CIV", "CUW"], F: ["NED", "JPN", "SWE", "TUN"],
-  G: ["BEL", "EGY", "IRN", "NZL"], H: ["ESP", "CPV", "KSA", "URU"], I: ["FRA", "SEN", "IRQ", "NOR"],
-  J: ["ARG", "ALG", "AUT", "JOR"], K: ["POR", "COD", "UZB", "COL"], L: ["ENG", "CRO", "GHA", "PAN"],
-};
-const GROUP_KEYS = Object.keys(GROUPS);
-const ALL_TEAMS = GROUP_KEYS.flatMap((g) => GROUPS[g]);
-
-const PAIRS = [[0, 1], [2, 3], [0, 2], [3, 1], [0, 3], [1, 2]];
-const groupFixtures = (g) =>
-  PAIRS.map((p, i) => ({ id: `${g}-${i}`, g, t1: GROUPS[g][p[0]], t2: GROUPS[g][p[1]] }));
-const ALL_GROUP_FIXTURES = GROUP_KEYS.flatMap(groupFixtures);
 
 /* ===== inline SVG flags (render everywhere, incl. Windows; simplified but recognizable) ===== */
 const _st = (cx, cy, R, fill) => {
@@ -182,6 +176,8 @@ function buildDraftRounds(n, rounds) {
 const LP = (lid) => ({
   config: `leagues/${lid}/config`,
   results: `leagues/${lid}/results`,
+  liveMeta: `leagues/${lid}/liveMeta/g`,
+  liveSync: `leagues/${lid}/liveSync`,
   bets: `leagues/${lid}/bets`,
   bet: (pid) => `leagues/${lid}/bets/${pid}`,
 });
@@ -1199,7 +1195,16 @@ function DraftTab({ config, meId, onSaveConfig, onTxConfig }) {
 
 /* ================= MANAGE TAB ================= */
 
-function ManageTab({ config, results, onSaveConfig, onSaveResults, onResetAll, betKeys }) {
+function ManageTab({
+  config,
+  results,
+  liveMeta,
+  onSaveConfig,
+  onSaveResults,
+  onClearManualOverride,
+  onResetAll,
+  betKeys,
+}) {
   const [resDraft, setResDraft] = useState(results);
   useEffect(() => setResDraft(results), [results]);
   const dirty = JSON.stringify(resDraft) !== JSON.stringify(results);
@@ -1280,16 +1285,38 @@ function ManageTab({ config, results, onSaveConfig, onSaveResults, onResetAll, b
             return (
               <Section key={g} title={"בית " + g} badge={`${done}/6`}>
                 <div className="flex flex-col gap-2">
-                  {fixes.map((f) => (
-                    <div key={f.id} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="flex min-w-0 flex-1 items-center gap-1 text-slate-300"><Flag code={f.t1} /><TName code={f.t1} /></span>
-                      <ScoreCell
-                        value={resDraft.g && resDraft.g[f.id]}
-                        onCommit={(v) => setGroupRes(f.id, v)}
-                      />
-                      <span className="flex min-w-0 flex-1 items-center justify-end gap-1 text-slate-300"><TName code={f.t2} /><Flag code={f.t2} /></span>
-                    </div>
-                  ))}
+                  {fixes.map((f) => {
+                    const meta = liveMeta?.[f.id];
+                    return (
+                      <div key={f.id} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 flex-1 items-center gap-1 text-slate-300"><Flag code={f.t1} /><TName code={f.t1} /></span>
+                        <div className="flex shrink-0 flex-col items-center gap-1">
+                          <ScoreCell
+                            value={resDraft.g && resDraft.g[f.id]}
+                            onCommit={(v) => setGroupRes(f.id, v)}
+                          />
+                          {meta?.manualOverride ? (
+                            <button
+                              onClick={() => onClearManualOverride(f.id)}
+                              className="rounded-full border border-amber-700 px-2 py-0.5 text-[10px] font-bold text-amber-300 hover:border-amber-500"
+                              title="הציון נשמר ידנית ולא יידרס על ידי העדכון החי"
+                            >
+                              MANUAL · החזר לאוטומטי
+                            </button>
+                          ) : meta?.status === "live" ? (
+                            <span className="rounded-full border border-emerald-600 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                              LIVE
+                            </span>
+                          ) : meta?.status === "finished" ? (
+                            <span className="rounded-full border border-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                              FINAL
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="flex min-w-0 flex-1 items-center justify-end gap-1 text-slate-300"><TName code={f.t2} /><Flag code={f.t2} /></span>
+                      </div>
+                    );
+                  })}
                 </div>
               </Section>
             );
@@ -2020,6 +2047,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState(null);
   const [results, setResults] = useState({ g: {}, ko: {} });
+  const [liveMeta, setLiveMeta] = useState({});
   const [betsAll, setBetsAll] = useState({});
   const [me, setMe] = useState(null);
   const [tab, setTab] = useState("table");
@@ -2036,7 +2064,7 @@ export default function App() {
 
   /* live subscriptions — everyone sees config, results and bets the moment they change */
   useEffect(() => {
-    setConfig(null); setResults({ g: {}, ko: {} }); setBetsAll({}); setMe(null); setTab("table");
+    setConfig(null); setResults({ g: {}, ko: {} }); setLiveMeta({}); setBetsAll({}); setMe(null); setTab("table");
     if (!leagueId || !dbReady) { setLoading(false); return; }
     setLoading(true);
     const P = LP(leagueId);
@@ -2051,8 +2079,9 @@ export default function App() {
       Object.entries(v || {}).forEach(([pid, b]) => { o[pid] = normBets(b); });
       setBetsAll(o);
     });
+    const u4 = subscribe(P.liveMeta, (v) => setLiveMeta(v || {}));
     setMe(localStorage.getItem(ME_KEY(leagueId)) || null);
-    return () => { u1(); u2(); u3(); };
+    return () => { u1(); u2(); u3(); u4(); };
   }, [leagueId]);
 
   /* drop a stale identity if the player list changed */
@@ -2067,7 +2096,25 @@ export default function App() {
       const next = mutate(normConfig(raw));
       return next === undefined ? undefined : next;
     });
-  const saveResults = async (res) => { setResults(res); await sSet(P.results, res); };
+  const saveResults = async (res) => {
+    const nextMeta = applyManualOverrides({
+      previousResults: results,
+      nextResults: res,
+      liveMeta,
+      now: Date.now(),
+    });
+    setResults(res);
+    setLiveMeta(nextMeta);
+    await sUpdate(`leagues/${leagueId}`, {
+      results: res,
+      "liveMeta/g": nextMeta,
+    });
+  };
+  const clearResultOverride = async (fixtureId) => {
+    const nextMeta = clearManualOverride(liveMeta, fixtureId, Date.now());
+    setLiveMeta(nextMeta);
+    await sSet(`${P.liveMeta}/${fixtureId}`, nextMeta[fixtureId]);
+  };
   const saveMyBets = async (bets) => {
     if (!me) return;
     setBetsAll((prev) => ({ ...prev, [me]: bets }));
@@ -2213,8 +2260,9 @@ export default function App() {
             </div>
             <div className={tab === "manage" ? "" : "hidden"}>
               <ManageTab
-                config={config} results={results}
-                onSaveConfig={saveConfig} onSaveResults={saveResults} onResetAll={resetAll}
+                config={config} results={results} liveMeta={liveMeta}
+                onSaveConfig={saveConfig} onSaveResults={saveResults}
+                onClearManualOverride={clearResultOverride} onResetAll={resetAll}
               />
             </div>
             <div className={tab === "rules" ? "" : "hidden"}>
