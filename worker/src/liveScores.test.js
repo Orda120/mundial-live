@@ -84,7 +84,7 @@ test("normalizes ESPN live and final events", () => {
   assert.equal(normalizeEspnEvent(espnEvent({ state: "post" })).status, "finished");
 });
 
-test("writes the mapped live score and metadata without touching other results", () => {
+test("writes the mapped live score in app fixture order without touching other results", () => {
   const now = Date.parse("2026-06-13T19:30:00Z");
   const patch = buildFirebasePatch({
     events: [espnEvent()],
@@ -93,7 +93,7 @@ test("writes the mapped live score and metadata without touching other results",
     now,
   });
 
-  assert.equal(patch["results/g/B-2"], "0-1");
+  assert.equal(patch["results/g/B-2"], "1-0");
   assert.deepEqual(patch["liveMeta/g/B-2"], {
     source: "espn",
     status: "live",

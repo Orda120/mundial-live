@@ -1,4 +1,4 @@
-import { fixtureIdForTeams } from "../../src/worldCupData.js";
+import { fixtureForTeams } from "../../src/worldCupData.js";
 
 const MINUTE = 60 * 1000;
 const SCHEDULE_REFRESH_MS = 12 * 60 * MINUTE;
@@ -99,8 +99,9 @@ export function buildFirebasePatch({
     const normalized = normalizeEspnEvent(event);
     if (!normalized || normalized.status === "scheduled") continue;
 
-    const fixtureId = fixtureIdForTeams(normalized.home, normalized.away);
-    if (!fixtureId || liveMeta[fixtureId]?.manualOverride) continue;
+    const fixture = fixtureForTeams(normalized.home, normalized.away);
+    if (!fixture || liveMeta[fixture.id]?.manualOverride) continue;
+    const fixtureId = fixture.id;
 
     if (existingResults[fixtureId] != null && !liveMeta[fixtureId]) {
       patch[`liveMeta/g/${fixtureId}`] = {
@@ -112,7 +113,11 @@ export function buildFirebasePatch({
       continue;
     }
 
-    patch[`results/g/${fixtureId}`] = `${normalized.homeScore}-${normalized.awayScore}`;
+    const [team1Score, team2Score] =
+      fixture.t1 === normalized.home
+        ? [normalized.homeScore, normalized.awayScore]
+        : [normalized.awayScore, normalized.homeScore];
+    patch[`results/g/${fixtureId}`] = `${team1Score}-${team2Score}`;
     patch[`liveMeta/g/${fixtureId}`] = {
       source: "espn",
       status: normalized.status,

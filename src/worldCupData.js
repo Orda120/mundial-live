@@ -19,11 +19,15 @@ export const groupFixtures = (group) =>
 
 export const ALL_GROUP_FIXTURES = GROUP_KEYS.flatMap(groupFixtures);
 
-export function fixtureIdForTeams(team1, team2) {
-  const fixture = ALL_GROUP_FIXTURES.find(
+export function fixtureForTeams(team1, team2) {
+  return ALL_GROUP_FIXTURES.find(
     ({ t1, t2 }) =>
       (t1 === team1 && t2 === team2) ||
       (t1 === team2 && t2 === team1)
   );
+}
+
+export function fixtureIdForTeams(team1, team2) {
+  const fixture = fixtureForTeams(team1, team2);
   return fixture?.id || null;
 }
