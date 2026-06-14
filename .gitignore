@@ -6,3 +6,4 @@ worker/.dev.vars
 worker/.wrangler
 worker/worker-configuration.d.ts
 .DS_Store
+.superpowers/
