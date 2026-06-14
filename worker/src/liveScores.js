@@ -65,6 +65,12 @@ export function normalizeEspnEvent(event) {
   const homeScore = Number(home?.score);
   const awayScore = Number(away?.score);
   const state = event?.status?.type?.state;
+  const displayClock =
+    event?.status?.displayClock ||
+    event?.status?.type?.shortDetail ||
+    event?.status?.type?.detail ||
+    event?.status?.type?.description ||
+    "";
 
   if (
     !homeCode ||
@@ -84,6 +90,7 @@ export function normalizeEspnEvent(event) {
     homeScore,
     awayScore,
     status: state === "in" ? "live" : state === "post" ? "finished" : "scheduled",
+    displayClock,
   };
 }
 
@@ -123,6 +130,7 @@ export function buildFirebasePatch({
       status: normalized.status,
       providerFixtureId: normalized.providerFixtureId,
       kickoff: normalized.kickoff,
+      displayClock: normalized.displayClock,
       updatedAt: now,
       manualOverride: false,
     };

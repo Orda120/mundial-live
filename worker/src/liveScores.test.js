@@ -19,11 +19,21 @@ const espnEvent = ({
   homeScore = "0",
   awayScore = "1",
   type = "group",
+  displayClock = "52'",
+  shortDetail = state === "post" ? "FT" : "52'",
 } = {}) => ({
   id,
   date,
   season: { type: 1 },
-  status: { type: { state, detail: state === "post" ? "FT" : "52'" } },
+  status: {
+    displayClock,
+    type: {
+      state,
+      detail: shortDetail,
+      shortDetail,
+      description: state === "post" ? "Final" : "In Progress",
+    },
+  },
   competitions: [{
     type: { abbreviation: type },
     competitors: [
@@ -79,9 +89,14 @@ test("normalizes ESPN live and final events", () => {
     homeScore: 0,
     awayScore: 1,
     status: "live",
+    displayClock: "52'",
   });
 
   assert.equal(normalizeEspnEvent(espnEvent({ state: "post" })).status, "finished");
+  assert.equal(
+    normalizeEspnEvent(espnEvent({ displayClock: null, shortDetail: "HT" })).displayClock,
+    "HT",
+  );
 });
 
 test("writes the mapped live score in app fixture order without touching other results", () => {
@@ -99,6 +114,7 @@ test("writes the mapped live score in app fixture order without touching other r
     status: "live",
     providerFixtureId: "760420",
     kickoff: "2026-06-13T19:00:00Z",
+    displayClock: "52'",
     updatedAt: now,
     manualOverride: false,
   });

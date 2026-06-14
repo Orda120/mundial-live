@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { dbReady, sSet, sUpdate, sDel, sTx, subscribe, subscribeConnected } from "./db";
 import { syncBetsDraft } from "./betsDraft";
+import { selectLiveMatches } from "./liveHeader";
 import { applyManualOverrides, clearManualOverride } from "./liveResults";
 import {
   ALL_GROUP_FIXTURES,
@@ -316,6 +317,40 @@ const Flag = ({ code, lg }) => {
 };
 const TName = ({ code }) => <span>{T[code]?.[0] || code}</span>;
 
+function LiveMatchPills({ matches, className = "" }) {
+  if (!matches.length) return null;
+
+  return (
+    <div
+      className={"gap-1.5 " + className}
+      role="status"
+      aria-live="polite"
+      aria-label="משחקים חיים"
+    >
+      {matches.map((match) => (
+        <div
+          key={match.id}
+          className="flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-800 bg-emerald-950 px-2.5 py-1 text-[10px] shadow-sm shadow-emerald-950"
+        >
+          <span className="flex items-center gap-1 font-black text-emerald-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-sm shadow-red-500" />
+            {match.displayClock ? `LIVE · ${match.displayClock}` : "LIVE"}
+          </span>
+          <span className="flex items-center gap-1 text-slate-200">
+            <Flag code={match.t1} />
+            <TName code={match.t1} />
+          </span>
+          <strong dir="ltr" className="text-sm text-white">{match.score}</strong>
+          <span className="flex items-center gap-1 text-slate-200">
+            <TName code={match.t2} />
+            <Flag code={match.t2} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TeamChip({ code, on, off, onClick, disabled, mark }) {
   return (
     <button
@@ -536,7 +571,7 @@ function Leaderboard({ config, scores, meId }) {
                 <span className={"w-4 font-mono text-xs " + (rank === 0 && r.total > 0 ? "text-amber-300" : "text-slate-500")}>{rank + 1}</span>
                 <PlayerDot player={r.p} idx={pIdx} />
                 <span className="truncate text-sm font-bold text-slate-100">{r.p.name}</span>
-                {isMe && <span className="rounded bg-slate-800 px-1 text-xs text-sky-300">אני</span>}
+                {isMe && <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-bold text-sky-300">אני</span>}
               </div>
               <div className="col-span-2 text-center font-mono text-sm text-slate-300">{r.draft}</div>
               <div className="col-span-2 text-center font-mono text-sm text-slate-300">{r.matches}</div>
@@ -2156,6 +2191,10 @@ export default function App() {
   };
 
   const scores = useMemo(() => (config ? computeScores(config, results, betsAll) : null), [config, results, betsAll]);
+  const liveMatches = useMemo(
+    () => selectLiveMatches({ results, liveMeta }),
+    [results, liveMeta],
+  );
 
   const meName = config?.players?.find((p) => p.id === me)?.name;
 
@@ -2166,37 +2205,53 @@ export default function App() {
         <div className="flex-1 bg-emerald-500" /><div className="flex-1 bg-rose-500" /><div className="flex-1 bg-sky-500" />
       </div>
 
-      <header className="mx-auto flex max-w-3xl items-center justify-between px-4 pb-2 pt-4">
-        <div>
-          <h1 className="text-xl font-black tracking-tight text-slate-50">
-            {config?.name || "מונדיאל 2026"} <span className="text-base">🇺🇸🇨🇦🇲🇽</span>
-          </h1>
-          <p className="text-xs text-slate-500">ליגת הימורים · מונדיאל 2026</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {meName && (
-            <button
-              onClick={() => pickMe(null)}
-              title="החלפת שחקן"
-              className="flex items-center gap-1.5 rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-500"
-            >
-              <Users size={12} /> {meName}
-            </button>
-          )}
-          {leagueId && config && (
-            <button
-              onClick={copyLink}
-              title="העתקת קישור הליגה"
-              className="flex items-center gap-1.5 rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-500"
-            >
-              {copied ? <Check size={12} className="text-emerald-400" /> : <Link2 size={12} />}
-              {copied ? "הועתק!" : "קישור לחברים"}
-            </button>
-          )}
-          <span
-            title={connected ? "מסונכרן חי" : "מנותק"}
-            className={"h-2 w-2 shrink-0 rounded-full " + (connected ? "bg-emerald-400" : "bg-slate-600")}
+      <header className="mx-auto max-w-3xl px-4 pb-2 pt-4">
+        <div className="flex items-center justify-between gap-3 md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-black tracking-tight text-slate-50">
+              {config?.name || "מונדיאל 2026"} <span className="text-base">🇺🇸🇨🇦🇲🇽</span>
+            </h1>
+            <p className="text-xs text-slate-500">ליגת הימורים · מונדיאל 2026</p>
+          </div>
+
+          <LiveMatchPills
+            matches={liveMatches}
+            className="hidden max-w-xs flex-col md:flex"
           />
+
+          <div className="flex items-center justify-end gap-2">
+            {meName && (
+              <button
+                onClick={() => pickMe(null)}
+                title="החלפת שחקן"
+                className="flex items-center gap-1.5 rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-500"
+              >
+                <Users size={12} /> {meName}
+              </button>
+            )}
+            {leagueId && config && (
+              <button
+                onClick={copyLink}
+                title="העתקת קישור הליגה"
+                className="flex items-center gap-1.5 rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-500"
+              >
+                {copied ? <Check size={12} className="text-emerald-400" /> : <Link2 size={12} />}
+                {copied ? "הועתק!" : "קישור לחברים"}
+              </button>
+            )}
+            {connected ? (
+              <span title="מסונכרן חי" className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+            ) : (
+              <span title="מנותק" className="h-2 w-2 shrink-0 rounded-full bg-slate-600" />
+            )}
+          </div>
+        </div>
+
+        <div className="-mx-1 mt-2 overflow-x-auto px-1 pb-1 md:hidden">
+          <LiveMatchPills matches={liveMatches} className="flex w-max flex-row" />
         </div>
       </header>
 
