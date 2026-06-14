@@ -151,17 +151,17 @@ Run: `npm --prefix worker run check`
 
 Expected: Wrangler dry-run succeeds.
 
-- [ ] **Step 2: Deploy Worker**
+- [x] **Step 2: Deploy Worker**
 
 Upload the bundled Worker while inheriting the existing Firebase URL,
 `LEAGUE_ID`, and `SYNC_TOKEN` bindings. Confirm the one-minute Cron remains
 configured and `/health` returns `ok: true`.
 
-- [ ] **Step 3: Commit and push**
+- [x] **Step 3: Commit and push**
 
 Commit the Worker, selector, UI, tests, spec, and plan. Push `main`.
 
-- [ ] **Step 4: Verify production**
+- [x] **Step 4: Verify production**
 
 Confirm the GitHub Pages workflow succeeds and Firebase live metadata receives
 `displayClock` on an eligible sync. Validate the published app renders the live
