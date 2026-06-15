@@ -139,6 +139,59 @@ async function runSafely(env, options) {
   }
 }
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+async function handleAiChat(request, env) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return Response.json(
+      { error: "AI not configured — set ANTHROPIC_API_KEY as a Worker secret" },
+      { status: 503, headers: CORS_HEADERS },
+    );
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  const { messages, systemPrompt } = body;
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return Response.json({ error: "messages required" }, { status: 400, headers: CORS_HEADERS });
+  }
+
+  const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      system: systemPrompt || "You are a helpful World Cup assistant. Always reply in Hebrew.",
+      messages,
+    }),
+  });
+
+  if (!anthropicRes.ok) {
+    const err = await anthropicRes.text();
+    return Response.json({ error: "Upstream AI error", details: err }, { status: 502, headers: CORS_HEADERS });
+  }
+
+  const data = await anthropicRes.json();
+  return Response.json(
+    { content: data.content?.[0]?.text ?? "" },
+    { headers: CORS_HEADERS },
+  );
+}
+
 export default {
   async scheduled(_controller, env, _ctx) {
     await runSafely(env, { now: Date.now() });
@@ -147,6 +200,10 @@ export default {
   async fetch(request, env, _ctx) {
     const url = new URL(request.url);
 
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
     if (request.method === "GET" && url.pathname === "/health") {
       return Response.json({
         ok: true,
@@ -154,6 +211,7 @@ export default {
         leagueConfigured: Boolean(env.LEAGUE_ID),
         firebaseConfigured: Boolean(env.FIREBASE_DATABASE_URL),
         manualSyncConfigured: Boolean(env.SYNC_TOKEN),
+        aiConfigured: Boolean(env.ANTHROPIC_API_KEY),
       });
     }
 
@@ -167,6 +225,10 @@ export default {
         dryRun: url.searchParams.get("dryRun") === "1",
       });
       return Response.json(result);
+    }
+
+    if (request.method === "POST" && url.pathname === "/ai-chat") {
+      return handleAiChat(request, env);
     }
 
     return Response.json({ error: "Not found" }, { status: 404 });

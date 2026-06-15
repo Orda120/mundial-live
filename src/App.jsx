@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Trophy, RefreshCw, Check, X, Plus, Trash2, ChevronDown, ChevronLeft,
   Lock, Unlock, Users, Target, Shuffle, Settings, BookOpen, Undo2, AlertTriangle, Pencil, FlaskConical, Link2,
+  Bot, Send, MessageSquare,
 } from "lucide-react";
 import { dbReady, sSet, sUpdate, sDel, sTx, subscribe, subscribeConnected } from "./db";
 import { syncBetsDraft } from "./betsDraft";
@@ -206,6 +207,10 @@ const normConfig = (c) =>
           bracket: !!(c.locks?.bracket),
           groups: !!(c.locks?.groups),
           ko: c.locks?.ko || {},
+        },
+        ai: {
+          enabled: !!(c.ai?.enabled),
+          workerUrl: c.ai?.workerUrl || "",
         },
         created: c.created || 0,
       };
@@ -1520,6 +1525,34 @@ function ManageTab({
         </div>
       </Section>
 
+      <Section title="יועץ AI">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-400">מאפשר לשחקנים לשאול AI שאלות על הטורניר, קבוצות והימורים.</p>
+            <button
+              onClick={() => onSaveConfig({ ...config, ai: { ...(config.ai || {}), enabled: !config?.ai?.enabled } })}
+              className={
+                "flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-bold " +
+                (config?.ai?.enabled ? "border-sky-400 text-sky-300" : "border-slate-600 text-slate-300")
+              }
+            >
+              <Bot size={14} /> {config?.ai?.enabled ? "פעיל" : "כבוי"}
+            </button>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">כתובת Worker (מ-Cloudflare) — נדרש גם ANTHROPIC_API_KEY כ-secret</label>
+            <input
+              type="url"
+              value={config?.ai?.workerUrl || ""}
+              onChange={(e) => onSaveConfig({ ...config, ai: { ...(config.ai || {}), workerUrl: e.target.value } })}
+              placeholder="https://mundial-live-scores.xxx.workers.dev"
+              className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 outline-none focus:border-sky-600"
+              dir="ltr"
+            />
+          </div>
+        </div>
+      </Section>
+
       <Section title="אזור מסוכן">
         <button
           onClick={async () => {
@@ -2118,6 +2151,144 @@ function SimTab({ config, results, betsAll, meId }) {
   );
 }
 
+/* ================= AI CHAT ================= */
+
+function AiChat({ config, results, betsAll, me }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  const workerUrl = config?.ai?.workerUrl?.replace(/\/+$/, "");
+
+  useEffect(() => {
+    if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, open]);
+
+  const buildSystemPrompt = () => {
+    const groupResults = Object.entries(results.g || {})
+      .map(([id, score]) => `${id}:${score}`)
+      .join(", ") || "טרם שוחקו";
+
+    const koResults = Object.entries(results.ko || {})
+      .map(([, m]) => `${m.t1} vs ${m.t2}${m.w ? ` → ${m.w}` : ""}`)
+      .join(", ") || "אין עדיין";
+
+    const myG = betsAll[me]?.g || {};
+    const myBetsStr = Object.entries(myG)
+      .map(([id, v]) => `${id}:${v}`)
+      .join(", ") || "אין הימורים";
+
+    return `אתה יועץ הימורים ידידותי לגביע העולם 2026. תמיד ענה בעברית, בקצרה ובצורה ידידותית.
+
+נתוני הטורניר הנוכחיים:
+• תוצאות שלב הבתים: ${groupResults}
+• שלב נוקאאוט: ${koResults}
+• הימורי השחקן הנוכחי: ${myBetsStr}
+
+תפקידך: לתת עצות הימורים, לנתח קבוצות, לענות על שאלות על הטורניר ולהסביר מי חזק ולמה. ענה תמיד בעברית.`;
+  };
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || loading || !workerUrl) return;
+
+    const userMsg = { role: "user", content: text };
+    const updated = [...messages, userMsg];
+    setMessages(updated);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${workerUrl}/ai-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: updated, systemPrompt: buildSystemPrompt() }),
+      });
+      const data = await res.json();
+      setMessages([...updated, { role: "assistant", content: data.content || "שגיאה בתשובה." }]);
+    } catch {
+      setMessages([...updated, { role: "assistant", content: "שגיאה בתקשורת עם השרת." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="יועץ AI"
+        className={
+          "fixed bottom-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-colors " +
+          (open ? "bg-sky-400 text-slate-950" : "bg-sky-500 text-white hover:bg-sky-400")
+        }
+      >
+        {open ? <X size={20} /> : <Bot size={22} />}
+      </button>
+
+      {open && (
+        <div className="fixed bottom-20 right-4 z-40 flex w-80 max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl" style={{ height: "60vh" }}>
+          <div className="flex items-center gap-2 border-b border-slate-700 px-4 py-3">
+            <Bot size={16} className="text-sky-400" />
+            <span className="flex-1 font-bold text-slate-100">יועץ AI</span>
+            <button onClick={() => setMessages([])} title="נקה שיחה" className="text-slate-500 hover:text-slate-300">
+              <RefreshCw size={14} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2" dir="rtl">
+            {messages.length === 0 && (
+              <p className="mt-4 text-center text-sm text-slate-500">
+                שאל אותי על הטורניר, קבוצות או עצות הימורים 🏆
+              </p>
+            )}
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={
+                  "max-w-[85%] rounded-xl px-3 py-2 text-sm " +
+                  (m.role === "user"
+                    ? "self-start bg-sky-500 bg-opacity-20 text-sky-100"
+                    : "self-end bg-slate-800 text-slate-200")
+                }
+              >
+                {m.content}
+              </div>
+            ))}
+            {loading && (
+              <div className="self-end rounded-xl bg-slate-800 px-3 py-2 text-sm text-slate-400">
+                ⏳ חושב...
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          <div className="flex items-center gap-2 border-t border-slate-700 p-3">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+              placeholder="שאל שאלה..."
+              disabled={loading}
+              className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-sky-500 disabled:opacity-50"
+              dir="rtl"
+            />
+            <button
+              onClick={send}
+              disabled={loading || !input.trim() || !workerUrl}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-slate-950 hover:bg-sky-400 disabled:opacity-40"
+            >
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 /* ================= APP ================= */
 
 const TABS = [
@@ -2380,6 +2551,9 @@ export default function App() {
           </>
         )}
       </main>
+      {config?.ai?.enabled && me && (
+        <AiChat config={config} results={results} betsAll={betsAll} me={me} />
+      )}
     </div>
   );
 }
