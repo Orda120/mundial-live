@@ -213,6 +213,23 @@ function computeGroupStandings(gResults) {
   }).join("\n");
 }
 
+function computeTeamForm(gResults) {
+  const form = {};
+  ALL_GROUP_FIXTURES.forEach((f) => {
+    const sc = scoreOf(gResults?.[f.id]);
+    if (!sc) return;
+    const [g1, g2] = sc;
+    const r1 = g1 > g2 ? "נצ" : g1 === g2 ? "ת" : "ה";
+    const r2 = g2 > g1 ? "נצ" : g2 === g1 ? "ת" : "ה";
+    (form[f.t1] = form[f.t1] || []).push(`${r1}(${g1}-${g2} vs ${T[f.t2]?.[0] || f.t2})`);
+    (form[f.t2] = form[f.t2] || []).push(`${r2}(${g2}-${g1} vs ${T[f.t1]?.[0] || f.t1})`);
+  });
+  if (Object.keys(form).length === 0) return null;
+  return Object.entries(form)
+    .map(([tc, rr]) => `${T[tc]?.[0] || tc}: ${rr.join(", ")}`)
+    .join("\n");
+}
+
 /* group results are stored as exact scores ("2-1"); legacy outcome values ("1"|"X"|"2") still work */
 const SCORE_RE = /^(\d{1,2})-(\d{1,2})$/;
 const scoreOf = (r) => { const m = typeof r === "string" && SCORE_RE.exec(r); return m ? [+m[1], +m[2]] : null; };
@@ -2244,9 +2261,22 @@ function AiChat({ config, results, betsAll, me, liveMeta }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
+  const [teamInsights, setTeamInsights] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
   const bottomRef = useRef(null);
 
   const workerUrl = config?.ai?.workerUrl?.replace(/\/+$/, "");
+
+  // Fetch ESPN news whenever chat opens
+  useEffect(() => {
+    if (!open || !workerUrl) return;
+    setInsightsLoading(true);
+    fetch(`${workerUrl}/team-insights`)
+      .then((r) => r.json())
+      .then((data) => setTeamInsights(data))
+      .catch(() => setTeamInsights(null))
+      .finally(() => setInsightsLoading(false));
+  }, [open, workerUrl]);
 
   // Upcoming group fixtures (no result yet) shown first, then ones with results
   const gameChips = useMemo(() => {
@@ -2350,7 +2380,26 @@ function AiChat({ config, results, betsAll, me, liveMeta }) {
       `ניחושי עולות: ${myBracket}`,
       "",
       consensusLines.length ? `=== דעת הליגה על משחקים קרובים ===\n${consensusLines.join("\n")}` : "",
-    ].filter((l) => l !== null).join("\n");
+      "",
+      // --- team form (computed from existing results) ---
+      (() => {
+        const form = computeTeamForm(results.g);
+        return form ? `=== כושר קבוצות בטורניר ===\n${form}` : "";
+      })(),
+      // --- ESPN news (fetched on open) ---
+      (() => {
+        const articles = teamInsights?.articles;
+        if (!articles?.length) return "";
+        const ts = teamInsights.updatedAt
+          ? `(עדכון: ${new Date(teamInsights.updatedAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })})`
+          : "";
+        const lines = articles.map((a) => {
+          const teams = a.teams?.length ? ` [${a.teams.join(", ")}]` : "";
+          return `• ${a.headline}${teams}${a.summary ? ": " + a.summary : ""}`;
+        }).join("\n");
+        return `=== חדשות ועדכוני שחקנים מ-ESPN ${ts} ===\n${lines}`;
+      })(),
+    ].filter((l) => l !== null && l !== "").join("\n");
   };
 
   const sendMsg = async (text) => {
@@ -2417,6 +2466,14 @@ function AiChat({ config, results, betsAll, me, liveMeta }) {
           <div className="flex items-center gap-2 border-b border-slate-700 px-4 py-3">
             <Bot size={16} className="text-sky-400" />
             <span className="flex-1 font-bold text-slate-100">יועץ AI</span>
+            {insightsLoading && (
+              <span className="text-[10px] text-slate-500 animate-pulse">טוען חדשות...</span>
+            )}
+            {!insightsLoading && teamInsights?.articles?.length > 0 && (
+              <span title={`${teamInsights.articles.length} כתבות ESPN נטענו`} className="text-[10px] text-emerald-500">
+                ✓ ESPN
+              </span>
+            )}
             <button
               onClick={() => { setMessages([]); setSelectedGame(null); }}
               title="נקה שיחה"

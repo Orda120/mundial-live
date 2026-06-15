@@ -9,6 +9,7 @@ import {
 
 const FULL_SCHEDULE_DATES = "20260611-20260719";
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
+const ESPN_NEWS_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/news";
 const ESPN_HEADERS = {
   Accept: "application/json",
   "User-Agent": "mundial-live-score-sync/1.0",
@@ -141,9 +142,38 @@ async function runSafely(env, options) {
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+
+async function handleTeamInsights() {
+  try {
+    const res = await fetch(`${ESPN_NEWS_URL}?limit=25`, { headers: ESPN_HEADERS });
+    if (!res.ok) throw new Error(`ESPN news returned ${res.status}`);
+    const data = await res.json();
+
+    const articles = (data.articles || [])
+      .filter((a) => a.headline)
+      .slice(0, 20)
+      .map((a) => ({
+        headline: a.headline,
+        summary: (a.description || "").replace(/\s+/g, " ").trim().slice(0, 300),
+        published: (a.published || "").slice(0, 10),
+        teams: (a.categories || [])
+          .filter((c) => c.type === "team" || c.type === "athlete")
+          .map((c) => c.description)
+          .filter(Boolean)
+          .slice(0, 4),
+      }));
+
+    return Response.json({ articles, updatedAt: Date.now() }, { headers: CORS_HEADERS });
+  } catch (err) {
+    return Response.json(
+      { articles: [], error: String(err), updatedAt: Date.now() },
+      { headers: CORS_HEADERS },
+    );
+  }
+}
 
 async function handleAiChat(request, env) {
   if (!env.ANTHROPIC_API_KEY) {
@@ -229,6 +259,10 @@ export default {
 
     if (request.method === "POST" && url.pathname === "/ai-chat") {
       return handleAiChat(request, env);
+    }
+
+    if (request.method === "GET" && url.pathname === "/team-insights") {
+      return handleTeamInsights();
     }
 
     return Response.json({ error: "Not found" }, { status: 404 });
