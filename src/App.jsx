@@ -202,7 +202,11 @@ const normConfig = (c) =>
               active: !!c.draft.active,
             }
           : null,
-        locks: c.locks || { bracket: false },
+        locks: {
+          bracket: !!(c.locks?.bracket),
+          groups: !!(c.locks?.groups),
+          ko: c.locks?.ko || {},
+        },
         created: c.created || 0,
       };
 const normResults = (r) => ({ g: (r && r.g) || {}, ko: (r && r.ko) || {} });
@@ -710,8 +714,8 @@ function BracketEditor({ draft, setDraft, locked, reach, hasAnyKoResults }) {
 
 /* ================= MY BETS: GROUP STAGE ================= */
 
-function MatchBetRow({ fix, res, pick, onPick, others }) {
-  const done = !!res;
+function MatchBetRow({ fix, res, pick, onPick, others, locked }) {
+  const done = !!res || !!locked;
   const resOut = outcomeOf(res);
   const sc = scoreOf(res);
   const Opt = ({ val, label }) => {
@@ -771,7 +775,7 @@ function MatchBetRow({ fix, res, pick, onPick, others }) {
   );
 }
 
-function GroupBets({ draft, setDraft, results, othersFor }) {
+function GroupBets({ draft, setDraft, results, othersFor, locked }) {
   return (
     <div className="flex flex-col gap-2">
       {GROUP_KEYS.map((g) => {
@@ -795,6 +799,7 @@ function GroupBets({ draft, setDraft, results, othersFor }) {
                     })
                   }
                   others={othersFor(f.id)}
+                  locked={locked}
                 />
               ))}
             </div>
@@ -807,7 +812,7 @@ function GroupBets({ draft, setDraft, results, othersFor }) {
 
 /* ================= MY BETS: KNOCKOUT ================= */
 
-function KoBets({ draft, setDraft, results, othersForKo }) {
+function KoBets({ draft, setDraft, results, othersForKo, koLocks }) {
   const koByRound = useMemo(() => {
     const map = {};
     Object.entries(results.ko || {}).forEach(([id, m]) => {
@@ -828,12 +833,14 @@ function KoBets({ draft, setDraft, results, othersForKo }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {KO_ROUNDS.filter((r) => koByRound[r.k]).map((r) => (
-        <Section key={r.k} title={r.n} defaultOpen badge={koByRound[r.k].length + " משחקים"}>
+      {KO_ROUNDS.filter((r) => koByRound[r.k]).map((r) => {
+        const roundLocked = !!(koLocks && koLocks[r.k]);
+        return (
+        <Section key={r.k} title={r.n} defaultOpen badge={koByRound[r.k].length + " משחקים"} sub={roundLocked ? "נעול 🔒" : undefined}>
           <div className="flex flex-col gap-2">
             {koByRound[r.k].map((m) => {
               const b = (draft.ko || {})[m.id] || {};
-              const done = !!m.w;
+              const done = !!m.w || roundLocked;
               const setB = (patch) =>
                 setDraft((prev) => {
                   const nko = { ...(prev.ko || {}) };
@@ -906,7 +913,8 @@ function KoBets({ draft, setDraft, results, othersForKo }) {
             })}
           </div>
         </Section>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -930,6 +938,8 @@ function MyBets({ me, config, results, betsAll, reach, onSaveBets }) {
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const locked = !!config?.locks?.bracket;
+  const groupsLocked = !!config?.locks?.groups;
+  const koLocks = config?.locks?.ko || {};
   const players = config.players;
   const hasAnyKoResults = Object.values(results.ko || {}).some((m) => m.w);
 
@@ -953,11 +963,11 @@ function MyBets({ me, config, results, betsAll, reach, onSaveBets }) {
       <Section title="ניחושי עולות" sub={locked ? "נעול 🔒" : "לנעול לפני פתיחת הטורניר!"} defaultOpen={!locked}>
         <BracketEditor draft={draft} setDraft={setDraft} locked={locked} reach={reach} hasAnyKoResults={hasAnyKoResults} />
       </Section>
-      <Section title="הימורי שלב הבתים" sub="נק׳ אחת לכל פגיעה">
-        <GroupBets draft={draft} setDraft={setDraft} results={results} othersFor={othersFor} />
+      <Section title="הימורי שלב הבתים" sub={groupsLocked ? "נעול 🔒" : "נק׳ אחת לכל פגיעה"}>
+        <GroupBets draft={draft} setDraft={setDraft} results={results} othersFor={othersFor} locked={groupsLocked} />
       </Section>
       <Section title="הימורי נוקאאוט" sub="עולה נכונה 1 + בונוס דרך 1" defaultOpen={Object.keys(results.ko || {}).length > 0}>
-        <KoBets draft={draft} setDraft={setDraft} results={results} othersForKo={othersForKo} />
+        <KoBets draft={draft} setDraft={setDraft} results={results} othersForKo={othersForKo} koLocks={koLocks} />
       </Section>
       <SaveBar
         show={dirty}
@@ -1309,6 +1319,50 @@ function ManageTab({
           >
             {config?.locks?.bracket ? <><Lock size={14} /> נעול</> : <><Unlock size={14} /> פתוח</>}
           </button>
+        </div>
+      </Section>
+
+      <Section title="נעילת הימורי שלב הבתים" defaultOpen>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-slate-400">נועלים לפני תחילת שלב הבתים — אחרי הנעילה לא ניתן לשנות הימורים.</p>
+          <button
+            onClick={() => onSaveConfig({ ...config, locks: { ...(config.locks || {}), groups: !config?.locks?.groups } })}
+            className={
+              "flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-bold " +
+              (config?.locks?.groups ? "border-amber-400 text-amber-300" : "border-slate-600 text-slate-300")
+            }
+          >
+            {config?.locks?.groups ? <><Lock size={14} /> נעול</> : <><Unlock size={14} /> פתוח</>}
+          </button>
+        </div>
+      </Section>
+
+      <Section title="נעילת הימורי נוקאאוט" defaultOpen>
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-slate-400">נועלים כל שלב לפני תחילת המשחקים שלו.</p>
+          {KO_ROUNDS.map((r) => {
+            const isLocked = !!(config?.locks?.ko?.[r.k]);
+            return (
+              <div key={r.k} className="flex items-center justify-between">
+                <span className="text-sm text-slate-300">{r.n}</span>
+                <button
+                  onClick={() => onSaveConfig({
+                    ...config,
+                    locks: {
+                      ...(config.locks || {}),
+                      ko: { ...(config.locks?.ko || {}), [r.k]: !isLocked },
+                    },
+                  })}
+                  className={
+                    "flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-bold " +
+                    (isLocked ? "border-amber-400 text-amber-300" : "border-slate-600 text-slate-300")
+                  }
+                >
+                  {isLocked ? <><Lock size={14} /> נעול</> : <><Unlock size={14} /> פתוח</>}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </Section>
 
