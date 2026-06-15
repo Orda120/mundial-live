@@ -145,6 +145,35 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+const GEMINI_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const GEMINI_MAX_ATTEMPTS = 3;
+const GEMINI_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+function retryDelayMs(response, attempt) {
+  const retryAfter = response.headers.get("Retry-After");
+  const retryAfterSeconds = Number(retryAfter);
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+    return Math.min(retryAfterSeconds * 1000, 5000);
+  }
+  return 300 * (2 ** attempt);
+}
+
+async function fetchGemini(options) {
+  let response;
+  for (let attempt = 0; attempt < GEMINI_MAX_ATTEMPTS; attempt += 1) {
+    response = await fetch(GEMINI_URL, options);
+    if (
+      response.ok ||
+      !GEMINI_RETRYABLE_STATUSES.has(response.status) ||
+      attempt === GEMINI_MAX_ATTEMPTS - 1
+    ) {
+      return response;
+    }
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs(response, attempt)));
+  }
+  return response;
+}
 
 async function handleTeamInsights() {
   try {
@@ -200,23 +229,20 @@ async function handleAiChat(request, env) {
     parts: [{ text: m.content }],
   }));
 
-  const geminiRes = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": env.GEMINI_API_KEY,
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemPrompt || "You are a helpful World Cup assistant. Always reply in Hebrew." }],
-        },
-        contents: geminiMessages,
-        generationConfig: { maxOutputTokens: 1024 },
-      }),
+  const geminiRes = await fetchGemini({
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": env.GEMINI_API_KEY,
     },
-  );
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: systemPrompt || "You are a helpful World Cup assistant. Always reply in Hebrew." }],
+      },
+      contents: geminiMessages,
+      generationConfig: { maxOutputTokens: 1024 },
+    }),
+  });
 
   if (!geminiRes.ok) {
     const err = await geminiRes.text();

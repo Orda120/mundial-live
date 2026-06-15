@@ -78,3 +78,54 @@ test("AI chat sends Gemini-compatible history to the supported model", async () 
     globalThis.fetch = originalFetch;
   }
 });
+
+test("AI chat retries a transient Gemini overload response", async () => {
+  const originalFetch = globalThis.fetch;
+  let attempts = 0;
+
+  globalThis.fetch = async () => {
+    attempts += 1;
+    if (attempts === 1) {
+      return Response.json(
+        {
+          error: {
+            code: 503,
+            message: "This model is currently experiencing high demand.",
+            status: "UNAVAILABLE",
+          },
+        },
+        {
+          status: 503,
+          headers: { "Retry-After": "0" },
+        },
+      );
+    }
+
+    return Response.json({
+      candidates: [{
+        content: {
+          parts: [{ text: "recovered" }],
+        },
+      }],
+    });
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://worker.test/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "question" }],
+        }),
+      }),
+      { GEMINI_API_KEY: "gemini-secret" },
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { content: "recovered" });
+    assert.equal(attempts, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
