@@ -2153,14 +2153,40 @@ function SimTab({ config, results, betsAll, meId }) {
 
 /* ================= AI CHAT ================= */
 
+const AI_GENERAL_QS = [
+  { label: "🏆 מי המועדף לגביע?", q: "מי המועדף לזכות בגביע העולם 2026 ולמה? תן ניתוח קצר." },
+  { label: "⚡ מי בכושר עכשיו?", q: "אילו קבוצות נמצאות בכושר הטוב ביותר כרגע בטורניר?" },
+  { label: "🎯 עצה להימור הבא", q: "בהתבסס על הימוריי הנוכחיים, על מה כדאי לי לשים לב?" },
+  { label: "😱 הפתעות הטורניר", q: "מה ההפתעות הגדולות עד כה בגביע העולם 2026?" },
+];
+
+const AI_GAME_QS = [
+  { label: "מי ינצח?", build: (t1, t2) => `מי לדעתך ינצח במשחק ${t1} נגד ${t2}? תן המלצת הימור מפורטת.` },
+  { label: "1 / X / 2?", build: (t1, t2) => `מהי ההמלצה שלך להימור 1 / X / 2 על ${t1} נגד ${t2}?` },
+  { label: "ניתוח כוחות", build: (t1, t2) => `נתח את נקודות החוזק והחולשה של ${t1} ו-${t2} לקראת המשחק ביניהן.` },
+];
+
 function AiChat({ config, results, betsAll, me }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedGame, setSelectedGame] = useState(null);
   const bottomRef = useRef(null);
 
   const workerUrl = config?.ai?.workerUrl?.replace(/\/+$/, "");
+
+  // Upcoming group fixtures (no result yet) shown first, then ones with results
+  const gameChips = useMemo(() => {
+    const upcoming = ALL_GROUP_FIXTURES.filter((f) => !results.g?.[f.id]);
+    const done = ALL_GROUP_FIXTURES.filter((f) => results.g?.[f.id]);
+    const koAll = Object.entries(results.ko || {}).map(([id, m]) => ({ id, t1: m.t1, t2: m.t2, isKo: true, done: !!m.w }));
+    return [
+      ...upcoming.map((f) => ({ id: f.id, t1: f.t1, t2: f.t2, done: false })),
+      ...koAll,
+      ...done.map((f) => ({ id: f.id, t1: f.t1, t2: f.t2, done: true })),
+    ].slice(0, 20);
+  }, [results]);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -2170,36 +2196,40 @@ function AiChat({ config, results, betsAll, me }) {
     const groupResults = Object.entries(results.g || {})
       .map(([id, score]) => `${id}:${score}`)
       .join(", ") || "טרם שוחקו";
-
     const koResults = Object.entries(results.ko || {})
       .map(([, m]) => `${m.t1} vs ${m.t2}${m.w ? ` → ${m.w}` : ""}`)
       .join(", ") || "אין עדיין";
-
-    const myG = betsAll[me]?.g || {};
-    const myBetsStr = Object.entries(myG)
+    const myBetsStr = Object.entries(betsAll[me]?.g || {})
       .map(([id, v]) => `${id}:${v}`)
       .join(", ") || "אין הימורים";
 
-    return `אתה יועץ הימורים ידידותי לגביע העולם 2026. תמיד ענה בעברית, בקצרה ובצורה ידידותית.
+    return `אתה יועץ הימורים מקצועי לגביע העולם 2026. ענה תמיד בעברית.
 
-נתוני הטורניר הנוכחיים:
+נתוני הטורניר:
 • תוצאות שלב הבתים: ${groupResults}
-• שלב נוקאאוט: ${koResults}
-• הימורי השחקן הנוכחי: ${myBetsStr}
+• נוקאאוט: ${koResults}
+• הימורי השחקן: ${myBetsStr}
 
-תפקידך: לתת עצות הימורים, לנתח קבוצות, לענות על שאלות על הטורניר ולהסביר מי חזק ולמה. ענה תמיד בעברית.`;
+כשנשאלים על משחק ספציפי, ענה תמיד במבנה הבא:
+🎯 המלצה: [1 / תיקו / 2 או שם הקבוצה]
+💪 נימוקים:
+• [נימוק 1]
+• [נימוק 2]
+• [נימוק 3 אם רלוונטי]
+⚠️ רמת ביטחון: גבוה / בינוני / נמוך
+💡 טיפ: [מידע נוסף חשוב]
+
+לשאלות כלליות — תמציתי, עם נקודות ענייניות.`;
   };
 
-  const send = async () => {
-    const text = input.trim();
-    if (!text || loading || !workerUrl) return;
-
-    const userMsg = { role: "user", content: text };
+  const sendMsg = async (text) => {
+    const msg = (text ?? input).trim();
+    if (!msg || loading || !workerUrl) return;
+    const userMsg = { role: "user", content: msg };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setInput("");
     setLoading(true);
-
     try {
       const res = await fetch(`${workerUrl}/ai-chat`, {
         method: "POST",
@@ -2215,6 +2245,25 @@ function AiChat({ config, results, betsAll, me }) {
     }
   };
 
+  const tName = (code) => T[code]?.[0] || code;
+  const tFlag = (code) => T[code]?.[1] || "🏳️";
+
+  const Chip = ({ label, active, onClick, muted }) => (
+    <button
+      onClick={onClick}
+      className={
+        "shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " +
+        (active
+          ? "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-200"
+          : muted
+            ? "border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+            : "border-slate-600 text-slate-300 hover:border-slate-400 hover:text-slate-100")
+      }
+    >
+      {label}
+    </button>
+  );
+
   return (
     <>
       <button
@@ -2229,26 +2278,35 @@ function AiChat({ config, results, betsAll, me }) {
       </button>
 
       {open && (
-        <div className="fixed bottom-20 right-4 z-40 flex w-80 max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl" style={{ height: "60vh" }}>
+        <div
+          className="fixed bottom-20 right-4 z-40 flex w-80 max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
+          style={{ height: "68vh" }}
+        >
+          {/* Header */}
           <div className="flex items-center gap-2 border-b border-slate-700 px-4 py-3">
             <Bot size={16} className="text-sky-400" />
             <span className="flex-1 font-bold text-slate-100">יועץ AI</span>
-            <button onClick={() => setMessages([])} title="נקה שיחה" className="text-slate-500 hover:text-slate-300">
+            <button
+              onClick={() => { setMessages([]); setSelectedGame(null); }}
+              title="נקה שיחה"
+              className="text-slate-500 hover:text-slate-300"
+            >
               <RefreshCw size={14} />
             </button>
           </div>
 
+          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2" dir="rtl">
             {messages.length === 0 && (
               <p className="mt-4 text-center text-sm text-slate-500">
-                שאל אותי על הטורניר, קבוצות או עצות הימורים 🏆
+                בחר משחק למטה, לחץ על שאלה מהירה, או כתוב שאלה חופשית 🏆
               </p>
             )}
             {messages.map((m, i) => (
               <div
                 key={i}
                 className={
-                  "max-w-[85%] rounded-xl px-3 py-2 text-sm " +
+                  "max-w-[90%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap " +
                   (m.role === "user"
                     ? "self-start bg-sky-500 bg-opacity-20 text-sky-100"
                     : "self-end bg-slate-800 text-slate-200")
@@ -2258,25 +2316,73 @@ function AiChat({ config, results, betsAll, me }) {
               </div>
             ))}
             {loading && (
-              <div className="self-end rounded-xl bg-slate-800 px-3 py-2 text-sm text-slate-400">
+              <div className="self-end animate-pulse rounded-xl bg-slate-800 px-3 py-2 text-sm text-slate-400">
                 ⏳ חושב...
               </div>
             )}
             <div ref={bottomRef} />
           </div>
 
+          {/* Game reference chips */}
+          {gameChips.length > 0 && (
+            <div className="border-t border-slate-700 px-3 pt-2 pb-1">
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">📅 משחקים</p>
+              <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1" dir="ltr">
+                {gameChips.map((g) => (
+                  <Chip
+                    key={g.id}
+                    label={`${tFlag(g.t1)} ${tFlag(g.t2)}`}
+                    active={selectedGame?.id === g.id}
+                    muted={g.done}
+                    onClick={() => setSelectedGame(selectedGame?.id === g.id ? null : g)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Contextual question chips */}
+          <div className="border-t border-slate-700 px-3 pt-2 pb-1">
+            {selectedGame ? (
+              <>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-sky-500">
+                  {tFlag(selectedGame.t1)} {tName(selectedGame.t1)} נגד {tName(selectedGame.t2)} {tFlag(selectedGame.t2)}
+                </p>
+                <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1" dir="rtl">
+                  {AI_GAME_QS.map((q) => (
+                    <Chip
+                      key={q.label}
+                      label={q.label}
+                      onClick={() => sendMsg(q.build(tName(selectedGame.t1), tName(selectedGame.t2)))}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">💬 שאלות מהירות</p>
+                <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1" dir="rtl">
+                  {AI_GENERAL_QS.map((q) => (
+                    <Chip key={q.label} label={q.label} onClick={() => sendMsg(q.q)} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Input */}
           <div className="flex items-center gap-2 border-t border-slate-700 p-3">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-              placeholder="שאל שאלה..."
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMsg()}
+              placeholder={selectedGame ? `שאל על ${tName(selectedGame.t1)} vs ${tName(selectedGame.t2)}…` : "שאל שאלה…"}
               disabled={loading}
               className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-sky-500 disabled:opacity-50"
               dir="rtl"
             />
             <button
-              onClick={send}
+              onClick={() => sendMsg()}
               disabled={loading || !input.trim() || !workerUrl}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-slate-950 hover:bg-sky-400 disabled:opacity-40"
             >
