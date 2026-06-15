@@ -1,0 +1,20 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Slate surface ladder" subtitle="Canvas → cards → insets → borders → text" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><link rel="stylesheet" href="../styles.css"/>
+<style>
+  html,body{margin:0;background:var(--surface-canvas);font-family:var(--font-sans)}
+  body{padding:18px}
+  .row{display:flex;gap:8px}
+  .sw{flex:1;border-radius:10px;border:1px solid var(--border-subtle);overflow:hidden}
+  .chip{height:54px}
+  .meta{padding:6px 8px}
+  .name{font-size:11px;font-weight:700;color:var(--text-strong)}
+  .hex{font-family:var(--font-mono);font-size:10px;color:var(--text-meta)}
+</style></head>
+<body>
+  <div class="row" id="r"></div>
+<script>
+  const steps=[["950","var(--slate-950)","#020617"],["900","var(--slate-900)","#0f172a"],["800","var(--slate-800)","#1e293b"],["700","var(--slate-700)","#334155"],["600","var(--slate-600)","#475569"],["500","var(--slate-500)","#64748b"],["400","var(--slate-400)","#94a3b8"],["300","var(--slate-300)","#cbd5e1"],["100","var(--slate-100)","#f1f5f9"]];
+  document.getElementById('r').innerHTML=steps.map(s=>`<div class="sw"><div class="chip" style="background:${s[1]}"></div><div class="meta"><div class="name">slate-${s[0]}</div><div class="hex">${s[2]}</div></div></div>`).join('');
+</script>
+</body></html>

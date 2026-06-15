@@ -1,0 +1,66 @@
+/* ============================================================
+   COLORS — Mundial 2026 League
+   A dark, slate-based palette lifted directly from the app
+   (Tailwind slate + accent ramps). The canvas is near-black
+   slate-950; surfaces step up in lightness; accents are
+   reserved for state and identity.
+   ============================================================ */
+
+:root {
+  /* ---- Neutrals (slate) — the structural backbone ---- */
+  --slate-950: #020617; /* app canvas / page background */
+  --slate-900: #0f172a; /* cards, nav, panels */
+  --slate-800: #1e293b; /* borders, chips, inset wells */
+  --slate-700: #334155; /* input borders, pill outlines */
+  --slate-600: #475569; /* muted icons, disabled dots */
+  --slate-500: #64748b; /* secondary / meta text */
+  --slate-400: #94a3b8; /* body text on dark */
+  --slate-300: #cbd5e1; /* high-contrast body, pill text */
+  --slate-200: #e2e8f0; /* near-white text */
+  --slate-100: #f1f5f9; /* headings */
+  --slate-50:  #f8fafc; /* brightest headings / on-accent never */
+
+  /* ---- Primary — sky (selection, links, primary action) ---- */
+  --sky-600: #0284c7;
+  --sky-500: #0ea5e9; /* primary button fill */
+  --sky-400: #38bdf8; /* primary hover / selected border */
+  --sky-300: #7dd3fc; /* selected text */
+  --sky-200: #bae6fd; /* selected text (strong) */
+
+  /* ---- Success / live — emerald (results, locked, connected) ---- */
+  --emerald-600: #059669;
+  --emerald-500: #10b981; /* confirmed result, start-draft button */
+  --emerald-400: #34d399; /* live connection dot, hits */
+  --emerald-300: #6ee7b7; /* result text */
+  --emerald-200: #a7f3d0;
+
+  /* ---- Warning / leader — amber (top of table, unsaved, alerts) ---- */
+  --amber-600: #d97706;
+  --amber-500: #f59e0b; /* unsaved-changes border */
+  --amber-400: #fbbf24; /* leader highlight, save button */
+  --amber-300: #fcd34d; /* leader text, warning text */
+
+  /* ---- Danger — rose (delete, misses, destructive) ---- */
+  --rose-500: #f43f5e;
+  --rose-400: #fb7185; /* delete hover, misses */
+  --rose-300: #fda4af;
+
+  /* ---- Player identity ramp — 12 distinct dot colors ---- */
+  --player-1:  #0ea5e9; /* sky-500    */
+  --player-2:  #f43f5e; /* rose-500   */
+  --player-3:  #10b981; /* emerald-500*/
+  --player-4:  #f59e0b; /* amber-500  */
+  --player-5:  #8b5cf6; /* violet-500 */
+  --player-6:  #06b6d4; /* cyan-500   */
+  --player-7:  #f97316; /* orange-500 */
+  --player-8:  #84cc16; /* lime-500   */
+  --player-9:  #d946ef; /* fuchsia-500*/
+  --player-10: #2dd4bf; /* teal-400   */
+  --player-11: #f87171; /* red-400    */
+  --player-12: #818cf8; /* indigo-400 */
+
+  /* ---- Host-nation tricolor (top accent bar) ---- */
+  --host-1: var(--emerald-500);
+  --host-2: var(--rose-500);
+  --host-3: var(--sky-500);
+}

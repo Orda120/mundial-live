@@ -1,0 +1,17 @@
+<!-- @dsCard group="Colors" viewport="700x130" name="Player identity ramp" subtitle="12 fixed colours assigned to players by index" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><link rel="stylesheet" href="../styles.css"/>
+<style>
+  html,body{margin:0;background:var(--surface-canvas);font-family:var(--font-sans)}
+  body{padding:18px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .dot{width:30px;height:30px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--text-on-accent)}
+</style></head>
+<body>
+  <div class="row" id="r"></div>
+<script>
+  const cols=Array.from({length:12},(_,i)=>`var(--player-${i+1})`);
+  const letters="דמיןטרכשעבגצא".split("");
+  document.getElementById('r').innerHTML=cols.map((c,i)=>`<div class="dot" style="background:${c}">${letters[i]||'?'}</div>`).join('');
+</script>
+</body></html>

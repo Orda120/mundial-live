@@ -1,0 +1,36 @@
+/* ============================================================
+   EFFECTS — radii, borders, shadows, motion
+   The app rounds generously (rounded-2xl cards, rounded-full
+   pills) and keeps shadows minimal — depth comes from the
+   slate surface ladder and hairline borders, not heavy drop
+   shadows. Transitions are short colour fades.
+   ============================================================ */
+
+:root {
+  /* ---- Radii ---- */
+  --radius-sm: 2px;    /* flags */
+  --radius-md: 6px;    /* small inline chips */
+  --radius-lg: 8px;    /* team toggle buttons, inputs-sm */
+  --radius-xl: 12px;   /* inputs, primary buttons */
+  --radius-2xl: 16px;  /* cards, nav, panels */
+  --radius-full: 9999px; /* pills, dots, connection light */
+
+  /* ---- Border widths ---- */
+  --border-hair: 1px;  /* the universal hairline */
+  --border-bar: 4px;   /* host tricolor accent bar */
+
+  /* ---- Shadows ---- */
+  --shadow-none: none;
+  --shadow-hairline: 0 0 0 1px rgb(148 163 184 / 0.35); /* flag/element ring */
+  --shadow-card: none;  /* cards rely on border, not shadow */
+  --shadow-raised: 0 10px 15px -3px rgb(0 0 0 / 0.4),
+                   0 4px 6px -4px rgb(0 0 0 / 0.4); /* sticky save bar */
+
+  /* ---- Motion ---- */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur-base: 150ms; /* @kind other */
+  --transition-colors: color var(--dur-base) var(--ease-standard),
+    background-color var(--dur-base) var(--ease-standard),
+    border-color var(--dur-base) var(--ease-standard);
+}

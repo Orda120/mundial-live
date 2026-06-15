@@ -1,0 +1,17 @@
+<!-- @dsCard group="Spacing" viewport="700x150" name="Corner radii" subtitle="rounded-lg chips → xl buttons → 2xl cards → full pills" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><link rel="stylesheet" href="../styles.css"/>
+<style>
+  html,body{margin:0;background:var(--surface-canvas);font-family:var(--font-sans)}
+  body{padding:20px;display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+  .b{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .box{width:74px;height:54px;background:var(--surface-card);border:1px solid var(--border-default)}
+  .cap{font-family:var(--font-mono);font-size:10px;color:var(--text-meta)}
+</style></head>
+<body>
+  <div class="b"><div class="box" style="border-radius:var(--radius-sm)"></div><span class="cap">sm · 2</span></div>
+  <div class="b"><div class="box" style="border-radius:var(--radius-lg)"></div><span class="cap">lg · 8</span></div>
+  <div class="b"><div class="box" style="border-radius:var(--radius-xl)"></div><span class="cap">xl · 12</span></div>
+  <div class="b"><div class="box" style="border-radius:var(--radius-2xl)"></div><span class="cap">2xl · 16</span></div>
+  <div class="b"><div class="box" style="width:54px;border-radius:var(--radius-full)"></div><span class="cap">full</span></div>
+</body></html>

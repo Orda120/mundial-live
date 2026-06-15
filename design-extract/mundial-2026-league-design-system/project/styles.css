@@ -1,0 +1,12 @@
+/* ============================================================
+   Mundial 2026 League — global stylesheet entry point.
+   Consumers link THIS file only. It is a manifest of @imports;
+   never add rules here directly. Everything reachable from
+   here ships to consuming projects.
+   ============================================================ */
+
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/effects.css";
+@import "./tokens/semantic.css";

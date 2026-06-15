@@ -1,0 +1,33 @@
+/* ============================================================
+   SPACING — Mundial 2026 League
+   A dense, mobile-first 4px scale. The app lives in a narrow
+   max-width column (max-w-3xl ≈ 768px) with px-4 gutters and
+   gap-1 / gap-2 between most elements.
+   ============================================================ */
+
+:root {
+  /* ---- 4px base scale ---- */
+  --space-0:  0;
+  --space-1:  4px;   /* gap-1 — tightest, nav gaps, dot gaps */
+  --space-1-5:6px;
+  --space-2:  8px;   /* gap-2 — default element gap */
+  --space-3:  12px;  /* card padding-y, panel px */
+  --space-4:  16px;  /* card padding, page gutter (px-4) */
+  --space-5:  20px;  /* card padding (setup) */
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ---- Layout ---- */
+  --container-max: 768px;   /* max-w-3xl — main column */
+  --container-form: 448px;  /* max-w-md — setup / identity */
+  --gutter: var(--space-4);
+
+  /* ---- Component insets ---- */
+  --pad-card: var(--space-4);
+  --pad-panel-x: var(--space-4);
+  --pad-panel-y: var(--space-3);
+  --pad-pill-x: 10px;
+  --pad-pill-y: 4px;
+}

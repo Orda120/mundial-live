@@ -1,0 +1,21 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Accent ramps" subtitle="Sky primary · emerald · amber · rose — each meaning a state" -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><link rel="stylesheet" href="../styles.css"/>
+<style>
+  html,body{margin:0;background:var(--surface-canvas);font-family:var(--font-sans)}
+  body{padding:18px;display:flex;flex-direction:column;gap:10px}
+  .grp{display:flex;align-items:center;gap:8px}
+  .role{width:120px;font-size:11px;color:var(--text-meta)}
+  .ramp{display:flex;gap:6px;flex:1}
+  .sw{flex:1;height:34px;border-radius:8px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;font-family:var(--font-mono);font-size:9px;color:rgba(2,6,23,.7);font-weight:700}
+</style></head>
+<body>
+  <div class="grp"><div class="role">Primary · selection</div><div class="ramp">
+    <div class="sw" style="background:var(--sky-500)">500</div><div class="sw" style="background:var(--sky-400)">400</div><div class="sw" style="background:var(--sky-300)">300</div><div class="sw" style="background:var(--sky-200)">200</div></div></div>
+  <div class="grp"><div class="role">Success · live · lock</div><div class="ramp">
+    <div class="sw" style="background:var(--emerald-500)">500</div><div class="sw" style="background:var(--emerald-400)">400</div><div class="sw" style="background:var(--emerald-300)">300</div><div class="sw" style="background:var(--emerald-200)">200</div></div></div>
+  <div class="grp"><div class="role">Leader · warn · save</div><div class="ramp">
+    <div class="sw" style="background:var(--amber-500)">500</div><div class="sw" style="background:var(--amber-400)">400</div><div class="sw" style="background:var(--amber-300)">300</div><div class="sw" style="background:var(--amber-600)">600</div></div></div>
+  <div class="grp"><div class="role">Danger · miss</div><div class="ramp">
+    <div class="sw" style="background:var(--rose-500)">500</div><div class="sw" style="background:var(--rose-400)">400</div><div class="sw" style="background:var(--rose-300)">300</div><div class="sw" style="background:var(--slate-800);color:var(--text-meta)">—</div></div></div>
+</body></html>

@@ -1,0 +1,20 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Tinted selection fills" subtitle="Accent at ~20% over dark = the selected-chip pattern" -->
+<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8"/><link rel="stylesheet" href="../styles.css"/>
+<style>
+  html,body{margin:0;background:var(--surface-canvas);font-family:var(--font-sans)}
+  body{padding:18px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1px solid;font-size:13px;font-weight:700}
+  .sel{background:var(--tint-select);border-color:var(--select-border);color:var(--select-text)}
+  .suc{background:var(--tint-success);border-color:var(--emerald-500);color:var(--emerald-300)}
+  .warn{background:var(--tint-warn);border-color:var(--amber-600);color:var(--amber-300)}
+  .ghost{background:transparent;border-color:var(--border-default);color:var(--text-body);font-weight:400}
+  .cap{width:100%;font-size:11px;color:var(--text-meta)}
+</style></head>
+<body>
+  <div class="cap">selected · result · warning · default(ghost)</div>
+  <span class="chip sel">הבחירה שלי ✓</span>
+  <span class="chip suc">תוצאה נעולה</span>
+  <span class="chip warn">שינויים לא נשמרו</span>
+  <span class="chip ghost">לא נבחר</span>
+</body></html>

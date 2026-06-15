@@ -1,0 +1,55 @@
+/* ============================================================
+   SEMANTIC TOKENS — meaning over value
+   Map raw palette/scale tokens onto roles. Components should
+   reference these, not the raw --slate-900 etc, wherever a
+   role exists.
+   ============================================================ */
+
+:root {
+  /* ---- Surfaces ---- */
+  --surface-canvas:   var(--slate-950); /* page background */
+  --surface-card:     var(--slate-900); /* cards, nav, panels */
+  --surface-inset:    var(--slate-800); /* chips, wells, badges */
+  --surface-field:    var(--slate-950); /* input backgrounds */
+  --surface-raised:   var(--slate-700); /* active tab pill */
+
+  /* ---- Borders ---- */
+  --border-subtle:  var(--slate-800); /* card / panel dividers */
+  --border-default: var(--slate-700); /* inputs, pills */
+  --border-strong:  var(--slate-600); /* hover outline */
+  --border-focus:   var(--sky-500);   /* focused field */
+
+  /* ---- Text ---- */
+  --text-heading:   var(--slate-50);
+  --text-strong:    var(--slate-100);
+  --text-body:      var(--slate-300);
+  --text-muted:     var(--slate-400);
+  --text-meta:      var(--slate-500); /* captions, labels, meta */
+  --text-faint:     var(--slate-600); /* placeholders, empty */
+  --text-on-accent: var(--slate-950); /* text on sky/amber/emerald fills */
+
+  /* ---- Primary action / selection ---- */
+  --action-bg:       var(--sky-500);
+  --action-bg-hover: var(--sky-400);
+  --action-text:     var(--slate-950);
+  --select-border:   var(--sky-400);
+  --select-text:     var(--sky-200);
+
+  /* ---- State accents ---- */
+  --state-success:    var(--emerald-500); /* confirmed results, locked */
+  --state-live:       var(--emerald-400); /* connection / hits */
+  --state-success-text: var(--emerald-300);
+  --state-leader:     var(--amber-400);   /* top of table */
+  --state-leader-text:var(--amber-300);
+  --state-warn:       var(--amber-500);   /* unsaved */
+  --state-danger:     var(--rose-400);    /* delete / miss */
+
+  /* ---- Tinted selection fills (used at ~20% opacity in app) ---- */
+  --tint-select:  rgb(14 165 233 / 0.20); /* sky 20% */
+  --tint-success: rgb(16 185 129 / 0.20); /* emerald 20% */
+  --tint-warn:    rgb(245 158 11 / 0.10); /* amber 10% */
+  --tint-leader:  rgb(251 191 36 / 0.10); /* amber 10% */
+
+  /* ---- Focus ring ---- */
+  --ring: 0 0 0 1px rgb(148 163 184 / 0.35); /* flag/element hairline */
+}

@@ -1,0 +1,17 @@
+<!-- @dsCard group="Brand" viewport="700x130" name="Flags — the product imagery" subtitle="Emoji flags in hairline-ringed boxes stand in for photography" -->
+<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8"/><link rel="stylesheet" href="../styles.css"/>
+<style>
+  html,body{margin:0;background:var(--surface-canvas);font-family:var(--font-sans)}
+  body{padding:20px;display:flex;gap:14px;flex-wrap:wrap}
+  .f{display:inline-flex;align-items:center;gap:6px}
+  .box{display:inline-flex;align-items:center;justify-content:center;width:24px;height:17px;border-radius:var(--radius-sm);box-shadow:var(--shadow-hairline);font-size:16px}
+  .nm{font-size:13px;color:var(--text-body)}
+</style></head>
+<body>
+<div id="r"></div>
+<script>
+  const T=[["🇧🇷","ברזיל"],["🇦🇷","ארגנטינה"],["🇫🇷","צרפת"],["🇪🇸","ספרד"],["🇩🇪","גרמניה"],["🇵🇹","פורטוגל"],["🇳🇱","הולנד"],["🇺🇸","ארה״ב"],["🇲🇽","מקסיקו"],["🇯🇵","יפן"],["🇲🇦","מרוקו"],["🏴󠁧󠁢󠁥󠁮󠁧󠁿","אנגליה"]];
+  document.body.querySelector('#r').outerHTML='<div style="display:flex;gap:14px;flex-wrap:wrap">'+T.map(t=>`<span class="f"><span class="box">${t[0]}</span><span class="nm">${t[1]}</span></span>`).join('')+'</div>';
+</script>
+</body></html>

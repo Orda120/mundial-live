@@ -1,0 +1,79 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Core — buttons, pills, dots, flags" subtitle="Buttons, toggle pills, cards, badges, player dots, flags" -->
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<script src="../../_ds_bundle.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  html, body { margin: 0; background: var(--surface-canvas); }
+  body { padding: 20px; font-family: var(--font-sans); }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .lbl { width: 100%; font-size: 11px; color: var(--text-meta); margin: 2px 0 -2px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { Button, Pill, Card, Badge, PlayerDot, Flag, ConnectionDot } = window.Mundial2026LeagueDesignSystem_4cb07a;
+
+function Demo() {
+  return (
+    <div>
+      <div className="lbl">Buttons</div>
+      <div className="row">
+        <Button tone="sky">צא לדרך ⚽</Button>
+        <Button tone="emerald">התחל דראפט</Button>
+        <Button tone="amber">שמור הימורים</Button>
+        <Button variant="ghost">עריכה</Button>
+        <Button variant="ghost" size="sm">קטן</Button>
+        <Button disabled>נעול</Button>
+      </div>
+
+      <div className="lbl">Toggle pills (1 / X / 2 · selected · result · miss)</div>
+      <div className="row">
+        <Pill>1</Pill>
+        <Pill selected>תיקו</Pill>
+        <Pill tone="emerald" selected mark="hit" icon={<Flag code="BRA" />}>ברזיל</Pill>
+        <Pill mark="miss" icon={<Flag code="ARG" />}>ארגנטינה</Pill>
+        <Pill disabled>נעול</Pill>
+      </div>
+
+      <div className="lbl">Player dots &amp; badges</div>
+      <div className="row">
+        <PlayerDot name="דניאל" idx={0} />
+        <PlayerDot name="מאיה" idx={1} />
+        <PlayerDot name="יוסי" idx={2} />
+        <PlayerDot name="נועה" idx={4} />
+        <PlayerDot name="טל" idx={6} />
+        <Badge mono>16</Badge>
+        <Badge tone="sky">אני</Badge>
+        <Badge tone="emerald">נעול</Badge>
+        <ConnectionDot connected />
+        <span style={{fontSize:'11px',color:'var(--text-meta)'}}>מסונכרן חי</span>
+      </div>
+
+      <div className="lbl">Flags</div>
+      <div className="row">
+        <Flag code="FRA" withName /><Flag code="ESP" withName /><Flag code="GER" withName /><Flag code="POR" withName /><Flag code="NED" withName />
+      </div>
+
+      <div className="lbl">Card</div>
+      <Card style={{maxWidth:320}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <PlayerDot name="דניאל" idx={0} />
+          <span style={{fontWeight:700,color:'var(--text-strong)',fontSize:14}}>דניאל</span>
+          <Badge tone="sky">אני</Badge>
+          <span style={{marginInlineStart:'auto',fontFamily:'var(--font-mono)',color:'var(--state-leader-text)',fontWeight:900}}>24.5</span>
+        </div>
+      </Card>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!-- @dsCard group="League App" viewport="800x640" name="League app — interactive recreation" subtitle="Setup → identity → table / bets / draft, fully click-through" -->
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>מונדיאל 2026 · ליגת החברים</title>
+<link rel="stylesheet" href="../../styles.css" />
+<script src="../../_ds_bundle.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+<style>
+  html, body { margin: 0; background: var(--surface-canvas); color: var(--text-strong); }
+  body { font-family: var(--font-sans); padding-bottom: 40px; min-height: 100vh; }
+  .ghost-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:var(--radius-full);
+    border:1px solid var(--border-default); background:transparent; color:var(--text-body); font-size:var(--text-xs);
+    cursor:pointer; font-family:var(--font-sans); transition:var(--transition-colors); }
+  .ghost-pill:hover { border-color:var(--border-strong); }
+  .icon-btn { background:transparent; border:none; cursor:pointer; padding:4px; display:inline-flex; }
+  .add-link { display:inline-flex; align-items:center; gap:4px; margin-top:8px; background:transparent; border:none;
+    color:var(--sky-400); font-size:var(--text-sm); cursor:pointer; font-family:var(--font-sans); }
+  .add-link:hover { color:var(--sky-300); }
+  .identity-btn { display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; border-radius:var(--radius-2xl);
+    border:1px solid var(--border-default); background:var(--surface-card); color:var(--text-strong); font-weight:700;
+    font-size:var(--text-sm); cursor:pointer; font-family:var(--font-sans); transition:var(--transition-colors); }
+  .identity-btn:hover { border-color:var(--sky-500); }
+  main { max-width: var(--container-max); margin: 0 auto; padding: 0 16px; }
+  .savebar { position:sticky; bottom:12px; z-index:20; margin-top:16px; display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; border-radius:var(--radius-2xl); border:1px solid var(--state-warn); background:var(--surface-card); box-shadow:var(--shadow-raised); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="data.js"></script>
+<script type="text/babel" src="screens.jsx" data-presets="react"></script>
+<script type="text/babel" data-presets="react">
+const KIT = window.Mundial2026LeagueDesignSystem_4cb07a;
+
+function App() {
+  const data = window.LEAGUE;
+  const [stage, setStage] = React.useState("setup"); // setup | identity | app
+  const [name, setName] = React.useState(data.name);
+  const [players, setPlayers] = React.useState(data.players);
+  const [me, setMe] = React.useState(null);
+  const [tab, setTab] = React.useState("table");
+  const [group, setGroup] = React.useState(data.groupA);
+  const [dirty, setDirty] = React.useState(false);
+
+  const createLeague = (n, names) => {
+    const ps = names.filter((x) => x.trim()).map((nm, i) => ({ id: "p" + i, name: nm.trim(), idx: i }));
+    setName(n); setPlayers(ps); setStage("identity");
+  };
+  const pick = (id) => { setMe(id); setStage("app"); };
+  const meName = players.find((p) => p.id === me)?.name;
+
+  const onBet = (fid, opt) => {
+    setGroup((g) => ({ ...g, fixtures: g.fixtures.map((f) => f.id === fid ? { ...f, bet: opt } : f) }));
+    setDirty(true);
+  };
+
+  const tabs = [
+    { key: "table", label: "טבלה", icon: <Icon name="Trophy" /> },
+    { key: "bets", label: "ההימורים שלי", icon: <Icon name="Target" /> },
+    { key: "draft", label: "דראפט", icon: <Icon name="Shuffle" /> },
+    { key: "sim", label: "סימולציה", icon: <Icon name="FlaskConical" /> },
+    { key: "manage", label: "ניהול", icon: <Icon name="Settings" /> },
+    { key: "rules", label: "חוקים", icon: <Icon name="BookOpen" /> },
+  ];
+
+  return (
+    <div>
+      <Header name={name} meName={meName} connected onSwitch={() => { setStage("identity"); setMe(null); }} />
+      <main>
+        {stage === "setup" && <SetupScreen onCreate={createLeague} />}
+        {stage === "identity" && <IdentityScreen players={players} onPick={pick} />}
+        {stage === "app" && (
+          <>
+            <div style={{ margin: "8px 0 16px" }}>
+              <KIT.TabBar tabs={tabs} active={tab} onChange={setTab} />
+            </div>
+            {tab === "table" && <Leaderboard rows={window.LEAGUE.rows} meId={me} />}
+            {tab === "bets" && (
+              <>
+                <BetsScreen group={group} onBet={onBet} />
+                {dirty && (
+                  <div className="savebar">
+                    <span style={{ fontSize: "var(--text-sm)", color: "var(--state-leader-text)" }}>יש שינויים שלא נשמרו</span>
+                    <KIT.Button tone="amber" size="sm" onClick={() => setDirty(false)}>שמור הימורים</KIT.Button>
+                  </div>
+                )}
+              </>
+            )}
+            {tab === "draft" && <DraftScreen draft={window.LEAGUE.draft} players={players} onPick={() => {}} />}
+            {(tab === "sim" || tab === "manage" || tab === "rules") && (
+              <div style={{ padding: "48px 0", textAlign: "center", color: "var(--text-meta)", fontSize: "var(--text-sm)" }}>
+                מסך “{tabs.find((t) => t.key === tab).label}” — ראו את לשוניות הטבלה, ההימורים והדראפט להדגמה אינטראקטיבית.
+              </div>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

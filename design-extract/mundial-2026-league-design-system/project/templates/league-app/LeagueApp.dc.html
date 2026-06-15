@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="League App — table screen" description="World Cup betting-league app shell: host tricolor, header, tab nav and the ranked leaderboard, built from the design system's own components." -->
+<helmet>
+  <script src="./ds-base.js"></script>
+  <style>
+    html, body { margin: 0; background: #020617; }
+    @keyframes lp-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(52,211,153,.5); }
+      70%  { box-shadow: 0 0 0 6px rgba(52,211,153,0); }
+      100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }
+    }
+  </style>
+</helmet>
+<div dir="rtl" style="min-height: 100vh; background: var(--surface-canvas); color: var(--text-strong); font-family: var(--font-sans); padding-bottom: 40px;">
+
+  <div style="display: flex; height: 4px;">
+    <div style="flex: 1; background: var(--host-1);"></div>
+    <div style="flex: 1; background: var(--host-2);"></div>
+    <div style="flex: 1; background: var(--host-3);"></div>
+  </div>
+
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px;">
+    <div>
+      <h1 style="margin: 0; font-size: var(--text-xl); font-weight: 900; letter-spacing: -.02em; color: var(--text-heading);">
+        ליגת החברים <span style="font-size: 15px;">🇺🇸🇨🇦🇲🇽</span>
+      </h1>
+      <p style="margin: 2px 0 0; font-size: var(--text-xs); color: var(--text-meta);">ליגת הימורים · מונדיאל 2026</p>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: var(--radius-full); border: 1px solid var(--border-default); color: var(--text-body); font-size: var(--text-xs);">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+        קישור לחברים
+      </span>
+      <span style="display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--state-live); animation: lp-pulse 1.8s ease infinite;"></span>
+    </div>
+  </header>
+
+  <main style="max-width: var(--container-max); margin: 0 auto; padding: 0 16px;">
+
+    <div style="margin: 8px 0 16px;">
+      <x-import component-from-global-scope="Mundial2026LeagueDesignSystem_4cb07a.TabBar" tabs="{{ tabs }}" active="{{ tab }}" on-change="{{ setTab }}" hint-size="100%,56px"></x-import>
+    </div>
+
+    <sc-if value="{{ showTable }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: grid; grid-template-columns: minmax(0,4fr) repeat(4, 2fr); padding: 0 12px; font-size: var(--text-xs); color: var(--text-meta);">
+          <div>שחקן</div>
+          <div style="text-align: center;">דראפט</div>
+          <div style="text-align: center;">משחקים</div>
+          <div style="text-align: center;">עולות</div>
+          <div style="text-align: center;">סה״כ</div>
+        </div>
+
+        <sc-for list="{{ rows }}" as="row" hint-placeholder-count="4">
+          <x-import component-from-global-scope="Mundial2026LeagueDesignSystem_4cb07a.Card" leader="{{ row.isLeader }}" padded="{{ false }}" hint-size="100%,60px">
+            <div style="display: grid; grid-template-columns: minmax(0,4fr) repeat(4, 2fr); align-items: center; padding: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                <sc-if value="{{ row.isLeader }}" hint-placeholder-val="{{ false }}">
+                  <span style="width: 16px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--state-leader-text);">{{ row.rank }}</span>
+                </sc-if>
+                <sc-if value="{{ row.notLeader }}" hint-placeholder-val="{{ true }}">
+                  <span style="width: 16px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-meta);">{{ row.rank }}</span>
+                </sc-if>
+                {{ row.dot }}
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); font-weight: 700; color: var(--text-strong);">{{ row.name }}</span>
+                <sc-if value="{{ row.isMe }}" hint-placeholder-val="{{ false }}">
+                  <span style="padding: 1px 8px; border-radius: var(--radius-full); background: var(--surface-inset); color: var(--sky-300); font-size: var(--text-xs); font-weight: 700;">אני</span>
+                </sc-if>
+              </div>
+              <div style="text-align: center; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-body);">{{ row.draft }}</div>
+              <div style="text-align: center; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-body);">{{ row.matches }}</div>
+              <div style="text-align: center; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-body);">{{ row.bracket }}</div>
+              <div style="text-align: center; font-family: var(--font-mono); font-size: var(--text-base); font-weight: 900; color: var(--text-strong);">
+                <sc-if value="{{ row.isLeader }}" hint-placeholder-val="{{ false }}"><span style="color: var(--state-leader-text);">{{ row.total }}</span></sc-if>
+                <sc-if value="{{ row.notLeader }}" hint-placeholder-val="{{ true }}">{{ row.total }}</sc-if>
+              </div>
+            </div>
+          </x-import>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ notTable }}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 56px 0; text-align: center; color: var(--text-meta); font-size: var(--text-sm);">
+        מסך “{{ otherLabel }}” — לשונית הטבלה היא ההדגמה החיה. החליפו ל“טבלה”, או הרחיבו את התבנית עם רכיבי מערכת העיצוב.
+      </div>
+    </sc-if>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 880, &quot;height&quot;: 600}}">
+class Component extends DCLogic {
+  state = { tab: "table" };
+
+  renderVals() {
+    const base = [
+      { id: "p2", name: "יוסי", idx: 2, draft: 11, matches: 6, bracket: 7.5, total: 24.5 },
+      { id: "p0", name: "דניאל", idx: 0, draft: 9, matches: 8, bracket: 6, total: 23 },
+      { id: "p1", name: "מאיה", idx: 1, draft: 8, matches: 5, bracket: 5.5, total: 18.5 },
+      { id: "p3", name: "נועה", idx: 3, draft: 7, matches: 4, bracket: 4, total: 15 },
+    ];
+    const me = "p0";
+    const PC = [
+      "var(--player-1)", "var(--player-2)", "var(--player-3)", "var(--player-4)",
+      "var(--player-5)", "var(--player-6)", "var(--player-7)", "var(--player-8)",
+      "var(--player-9)", "var(--player-10)", "var(--player-11)", "var(--player-12)",
+    ];
+    const rows = base.map((r, i) => ({
+      ...r,
+      rank: i + 1,
+      isLeader: i === 0,
+      notLeader: i !== 0,
+      isMe: r.id === me,
+      dot: React.createElement(
+        "span",
+        {
+          style: {
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0, width: 20, height: 20, borderRadius: "9999px",
+            background: PC[r.idx % PC.length], color: "var(--text-on-accent)",
+            fontSize: 11, fontWeight: 700, lineHeight: 1,
+          },
+        },
+        r.name.trim()[0] || "?"
+      ),
+    }));
+
+    const tabs = [
+      { key: "table", label: "טבלה" },
+      { key: "bets", label: "ההימורים שלי" },
+      { key: "draft", label: "דראפט" },
+      { key: "sim", label: "סימולציה" },
+      { key: "manage", label: "ניהול" },
+      { key: "rules", label: "חוקים" },
+    ];
+
+    const tab = this.state.tab;
+    return {
+      tabs,
+      tab,
+      setTab: (k) => this.setState({ tab: k }),
+      rows,
+      showTable: tab === "table",
+      notTable: tab !== "table",
+      otherLabel: (tabs.find((t) => t.key === tab) || {}).label,
+    };
+  }
+}
+</script>
+</body>
+</html>
