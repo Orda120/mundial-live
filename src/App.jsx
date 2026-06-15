@@ -141,6 +141,78 @@ const COLORS = [
 
 const EMPTY_BETS = { g: {}, ko: {}, br: { r32: [], r16: [], qf: [], sf: [], fin: [], win: [] } };
 
+/* ================= AI STATIC CONTEXT ================= */
+
+function buildAiStaticContext() {
+  const groupsText = GROUP_KEYS.map((g) =>
+    `  בית ${g}: ${GROUPS[g].map((c) => T[c]?.[0] || c).join(", ")}`
+  ).join("\n");
+
+  const fixtureCount = GROUP_KEYS.length * 6;
+  const tiersText = TIERS.map((t) => `${t.n} (${t.pts} נק׳)`).join(" | ");
+  const koText = KO_ROUNDS.map((r) => r.n).join(" ← ");
+
+  return `אתה יועץ הימורים מקצועי עבור ליגת הימורים פנימית על גביע העולם FIFA 2026.
+ענה תמיד בעברית, בצורה ממוקדת וידידותית.
+
+=== פורמט הטורניר ===
+48 נבחרות, 12 בתים (A–L), 4 נבחרות בכל בית.
+${fixtureCount} משחקי שלב הבתים. מהכל בית עולות 2 נבחרות; בנוסף 8 המיקומות השלישיים הטובים מעפילים — סה״כ 32 לנוקאאוט.
+שלב הנוקאאוט: ${koText}.
+
+=== הבתים ===
+${groupsText}
+
+=== חוקי הניקוד (בליגה זו) ===
+דראפט נבחרות:
+  • ניצחון ב-90 דק׳ = 3 נק׳
+  • תיקו / הפסד בהארכה/פנדלים = 1 נק׳
+  • הפסד ב-90 דק׳ = 0 נק׳
+הימורי שלב הבתים (1/X/2): 1 נק׳ להגדרת תוצאה נכונה.
+הימורי נוקאאוט: עולה נכונה = 1 נק׳, + 1 נק׳ בונוס לניחוש דרך (90 דק׳ / הארכה-פנדלים).
+ניחושי עולות: ${tiersText}.
+
+=== פורמט תשובה למשחק ספציפי ===
+כשנשאלים על משחק, ענה תמיד במבנה הבא:
+🎯 המלצה: [1 / תיקו / 2]
+💪 נימוקים:
+• [נימוק 1]
+• [נימוק 2]
+• [נימוק 3 אם רלוונטי]
+⚠️ רמת ביטחון: גבוה / בינוני / נמוך
+💡 טיפ: [מידע נוסף חשוב]`;
+}
+
+const AI_STATIC_CONTEXT = buildAiStaticContext();
+
+function computeGroupStandings(gResults) {
+  return GROUP_KEYS.map((g) => {
+    const teams = GROUPS[g];
+    const stats = Object.fromEntries(teams.map((t) => [t, { w: 0, d: 0, l: 0, gf: 0, ga: 0 }]));
+    groupFixtures(g).forEach((f) => {
+      const sc = scoreOf(gResults?.[f.id]);
+      if (!sc) return;
+      const [g1, g2] = sc;
+      if (g1 > g2) { stats[f.t1].w++; stats[f.t2].l++; }
+      else if (g1 < g2) { stats[f.t2].w++; stats[f.t1].l++; }
+      else { stats[f.t1].d++; stats[f.t2].d++; }
+      stats[f.t1].gf += g1; stats[f.t1].ga += g2;
+      stats[f.t2].gf += g2; stats[f.t2].ga += g1;
+    });
+    const rows = teams
+      .map((t) => {
+        const s = stats[t];
+        const pts = s.w * 3 + s.d;
+        return { t, pts, gd: s.gf - s.ga, gf: s.gf, played: s.w + s.d + s.l };
+      })
+      .sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
+    const line = rows.map((r, i) =>
+      `${i + 1}. ${T[r.t]?.[0] || r.t} ${r.pts}נק׳${r.played === 0 ? "" : ` (${r.played} משחקים)`}`
+    ).join(" | ");
+    return `בית ${g}: ${line}`;
+  }).join("\n");
+}
+
 /* group results are stored as exact scores ("2-1"); legacy outcome values ("1"|"X"|"2") still work */
 const SCORE_RE = /^(\d{1,2})-(\d{1,2})$/;
 const scoreOf = (r) => { const m = typeof r === "string" && SCORE_RE.exec(r); return m ? [+m[1], +m[2]] : null; };
@@ -2166,7 +2238,7 @@ const AI_GAME_QS = [
   { label: "ניתוח כוחות", build: (t1, t2) => `נתח את נקודות החוזק והחולשה של ${t1} ו-${t2} לקראת המשחק ביניהן.` },
 ];
 
-function AiChat({ config, results, betsAll, me }) {
+function AiChat({ config, results, betsAll, me, liveMeta }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -2193,33 +2265,92 @@ function AiChat({ config, results, betsAll, me }) {
   }, [messages, open]);
 
   const buildSystemPrompt = () => {
-    const groupResults = Object.entries(results.g || {})
-      .map(([id, score]) => `${id}:${score}`)
-      .join(", ") || "טרם שוחקו";
-    const koResults = Object.entries(results.ko || {})
-      .map(([, m]) => `${m.t1} vs ${m.t2}${m.w ? ` → ${m.w}` : ""}`)
-      .join(", ") || "אין עדיין";
-    const myBetsStr = Object.entries(betsAll[me]?.g || {})
-      .map(([id, v]) => `${id}:${v}`)
-      .join(", ") || "אין הימורים";
+    // --- group standings ---
+    const standings = computeGroupStandings(results.g);
 
-    return `אתה יועץ הימורים מקצועי לגביע העולם 2026. ענה תמיד בעברית.
+    // --- KO bracket ---
+    const koEntries = Object.entries(results.ko || {});
+    const koText = koEntries.length
+      ? koEntries.map(([, m]) => {
+          const round = KO_ROUNDS.find((r) => r.k === m.round)?.n || m.round;
+          const winner = m.w ? ` → ${T[m.w]?.[0] || m.w}${m.p === "et" ? " (הארכה)" : ""}` : " (טרם שוחק)";
+          return `${round}: ${T[m.t1]?.[0] || m.t1} vs ${T[m.t2]?.[0] || m.t2}${winner}`;
+        }).join("\n")
+      : "אין עדיין";
 
-נתוני הטורניר:
-• תוצאות שלב הבתים: ${groupResults}
-• נוקאאוט: ${koResults}
-• הימורי השחקן: ${myBetsStr}
+    // --- live matches ---
+    const liveMatches = ALL_GROUP_FIXTURES.filter((f) => liveMeta?.[f.id]?.status === "live");
+    const liveText = liveMatches.length
+      ? liveMatches.map((f) => {
+          const meta = liveMeta[f.id];
+          const score = results.g?.[f.id] ? ` (${results.g[f.id]})` : "";
+          const clock = meta.displayClock ? ` [${meta.displayClock}]` : "";
+          return `${T[f.t1]?.[0] || f.t1} vs ${T[f.t2]?.[0] || f.t2}${score}${clock}`;
+        }).join("; ")
+      : null;
 
-כשנשאלים על משחק ספציפי, ענה תמיד במבנה הבא:
-🎯 המלצה: [1 / תיקו / 2 או שם הקבוצה]
-💪 נימוקים:
-• [נימוק 1]
-• [נימוק 2]
-• [נימוק 3 אם רלוונטי]
-⚠️ רמת ביטחון: גבוה / בינוני / נמוך
-💡 טיפ: [מידע נוסף חשוב]
+    // --- upcoming matches with kickoff times ---
+    const upcoming = ALL_GROUP_FIXTURES
+      .filter((f) => !results.g?.[f.id] && liveMeta?.[f.id]?.kickoff)
+      .slice(0, 12)
+      .map((f) => {
+        const kick = new Date(liveMeta[f.id].kickoff).toLocaleString("he-IL", {
+          month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem",
+        });
+        return `${f.id}: ${T[f.t1]?.[0] || f.t1} vs ${T[f.t2]?.[0] || f.t2} — ${kick}`;
+      });
 
-לשאלות כלליות — תמציתי, עם נקודות ענייניות.`;
+    // --- my bets ---
+    const myBets = betsAll[me] || EMPTY_BETS;
+    const myGroupBets = Object.entries(myBets.g || {})
+      .map(([id, v]) => `${id}:${v}`).join(", ") || "אין";
+    const myKoBets = Object.entries(myBets.ko || {})
+      .map(([id, b]) => `${id}: ${T[b.t]?.[0] || b.t || "?"}${b.p ? ` (${b.p === "et" ? "הארכה" : "90"})` : ""}`).join(", ") || "אין";
+    const myBracket = TIERS.map((t) =>
+      `${t.n}: ${(myBets.br?.[t.k] || []).map((c) => T[c]?.[0] || c).join(", ") || "אין"}`
+    ).join(" | ");
+
+    // --- my draft teams ---
+    const myTeams = Object.entries(config?.assign || {})
+      .filter(([, pid]) => pid === me)
+      .map(([tc]) => T[tc]?.[0] || tc);
+
+    // --- league consensus (how other players bet on each upcoming fixture) ---
+    const players = config?.players || [];
+    const consensusLines = ALL_GROUP_FIXTURES
+      .filter((f) => !results.g?.[f.id])
+      .slice(0, 15)
+      .map((f) => {
+        const votes = { "1": 0, "X": 0, "2": 0 };
+        players.forEach((p) => { const v = betsAll[p.id]?.g?.[f.id]; if (v) votes[v]++; });
+        const total = votes["1"] + votes["X"] + votes["2"];
+        if (total === 0) return null;
+        const myVote = myBets.g?.[f.id];
+        const summary = Object.entries(votes).filter(([, c]) => c > 0)
+          .map(([k, c]) => `${k}:${c}`).join(", ");
+        return `${f.id} (${T[f.t1]?.[0] || f.t1} vs ${T[f.t2]?.[0] || f.t2}): ${summary}${myVote ? ` — הימורי: ${myVote}` : " — לא הימרתי"}`;
+      }).filter(Boolean);
+
+    return [
+      AI_STATIC_CONTEXT,
+      "",
+      "=== מצב הטורניר כרגע ===",
+      "טבלאות שלב הבתים:",
+      standings,
+      "",
+      "שלב הנוקאאוט:",
+      koText,
+      liveText ? `\n🔴 עכשיו חי: ${liveText}` : "",
+      upcoming.length ? `\nמשחקים קרובים:\n${upcoming.join("\n")}` : "",
+      "",
+      "=== הפרופיל שלי בליגה ===",
+      `נבחרות הדראפט שלי: ${myTeams.length ? myTeams.join(", ") : "אין עדיין"}`,
+      `הימורי שלב הבתים: ${myGroupBets}`,
+      `הימורי נוקאאוט: ${myKoBets}`,
+      `ניחושי עולות: ${myBracket}`,
+      "",
+      consensusLines.length ? `=== דעת הליגה על משחקים קרובים ===\n${consensusLines.join("\n")}` : "",
+    ].filter((l) => l !== null).join("\n");
   };
 
   const sendMsg = async (text) => {
@@ -2658,7 +2789,7 @@ export default function App() {
         )}
       </main>
       {config?.ai?.enabled && me && (
-        <AiChat config={config} results={results} betsAll={betsAll} me={me} />
+        <AiChat config={config} results={results} betsAll={betsAll} me={me} liveMeta={liveMeta} />
       )}
     </div>
   );
