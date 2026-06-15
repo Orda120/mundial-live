@@ -8,7 +8,7 @@ export const SCORE_BREAKDOWN_LABELS = {
   matchGroup: "ניחוש משחקי בתים",
   matchKoWinner: "ניחוש מנצחת נוקאאוט",
   matchKoMethod: "בונוס שיטת הכרעה",
-  bracketR32: "עולות לשמינית",
+  bracketR32: "עולות לשלב ה־32",
   bracketR16: "עולות לשמינית הגמר",
   bracketQf: "עולות לרבע הגמר",
   bracketSf: "עולות לחצי הגמר",
