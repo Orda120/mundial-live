@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const appPath = new URL("../src/App.jsx", import.meta.url);
-let source = readFileSync(appPath, "utf8");
+const originalSource = readFileSync(appPath, "utf8");
+const newline = originalSource.includes("\r\n") ? "\r\n" : "\n";
+let source = originalSource.replaceAll("\r\n", "\n");
 let changed = false;
 
 function replaceOnce(search, replacement, label) {
@@ -192,7 +194,7 @@ const BracketPeekCtx = React.createContext({});`,
 );
 
 if (changed) {
-  writeFileSync(appPath, source);
+  writeFileSync(appPath, source.replaceAll("\n", newline));
   console.log("Applied score breakdown UI patch to src/App.jsx");
 } else {
   console.log("Score breakdown UI patch already applied");

@@ -176,9 +176,9 @@ async function handleTeamInsights() {
 }
 
 async function handleAiChat(request, env) {
-  if (!env.ANTHROPIC_API_KEY) {
+  if (!env.GEMINI_API_KEY) {
     return Response.json(
-      { error: "AI not configured — set ANTHROPIC_API_KEY as a Worker secret" },
+      { error: "AI not configured — set GEMINI_API_KEY as a Worker secret" },
       { status: 503, headers: CORS_HEADERS },
     );
   }
@@ -195,31 +195,37 @@ async function handleAiChat(request, env) {
     return Response.json({ error: "messages required" }, { status: 400, headers: CORS_HEADERS });
   }
 
-  const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      system: systemPrompt || "You are a helpful World Cup assistant. Always reply in Hebrew.",
-      messages,
-    }),
-  });
+  const geminiMessages = messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
 
-  if (!anthropicRes.ok) {
-    const err = await anthropicRes.text();
+  const geminiRes = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt || "You are a helpful World Cup assistant. Always reply in Hebrew." }],
+        },
+        contents: geminiMessages,
+        generationConfig: { maxOutputTokens: 1024 },
+      }),
+    },
+  );
+
+  if (!geminiRes.ok) {
+    const err = await geminiRes.text();
     return Response.json({ error: "Upstream AI error", details: err }, { status: 502, headers: CORS_HEADERS });
   }
 
-  const data = await anthropicRes.json();
-  return Response.json(
-    { content: data.content?.[0]?.text ?? "" },
-    { headers: CORS_HEADERS },
-  );
+  const data = await geminiRes.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  return Response.json({ content: text }, { headers: CORS_HEADERS });
 }
 
 export default {
@@ -241,7 +247,7 @@ export default {
         leagueConfigured: Boolean(env.LEAGUE_ID),
         firebaseConfigured: Boolean(env.FIREBASE_DATABASE_URL),
         manualSyncConfigured: Boolean(env.SYNC_TOKEN),
-        aiConfigured: Boolean(env.ANTHROPIC_API_KEY),
+        aiConfigured: Boolean(env.GEMINI_API_KEY),
       });
     }
 

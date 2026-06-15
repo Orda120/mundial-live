@@ -94,8 +94,9 @@ npm run build
 npm --prefix worker run check
 ```
 
-Worker deployment requires `LEAGUE_ID` and `SYNC_TOKEN` as Cloudflare secrets.
-Do not put either value in Git. To inspect production logs after authenticating
+Worker deployment requires `LEAGUE_ID`, `SYNC_TOKEN`, and `GEMINI_API_KEY` as
+Cloudflare secrets. The AI consultant uses the stable `gemini-2.5-flash` model.
+Do not put secret values in Git. To inspect production logs after authenticating
 Wrangler:
 
 ```bash
