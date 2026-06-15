@@ -5,6 +5,7 @@ import {
   Bot, Send, MessageSquare,
 } from "lucide-react";
 import { dbReady, sSet, sUpdate, sDel, sTx, subscribe, subscribeConnected } from "./db";
+import { resolveAiWorkerUrl } from "./aiConfig";
 import { syncBetsDraft } from "./betsDraft";
 import { selectLiveMatches } from "./liveHeader";
 import { applyManualOverrides, clearManualOverride } from "./liveResults";
@@ -308,7 +309,7 @@ const normConfig = (c) =>
         },
         ai: {
           enabled: !!(c.ai?.enabled),
-          workerUrl: c.ai?.workerUrl || "",
+          workerUrl: resolveAiWorkerUrl(c.ai?.workerUrl),
         },
         created: c.created || 0,
       };
@@ -2313,7 +2314,7 @@ function AiChat({ config, results, betsAll, me, liveMeta }) {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const bottomRef = useRef(null);
 
-  const workerUrl = config?.ai?.workerUrl?.replace(/\/+$/, "");
+  const workerUrl = resolveAiWorkerUrl(config?.ai?.workerUrl);
 
   // Fetch ESPN news whenever chat opens
   useEffect(() => {
