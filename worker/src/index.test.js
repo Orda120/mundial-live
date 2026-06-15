@@ -61,7 +61,7 @@ test("AI chat sends Gemini-compatible history to the supported model", async () 
     assert.deepEqual(await response.json(), { content: "answer" });
     assert.equal(
       upstreamRequest.request,
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent",
     );
     assert.equal(upstreamRequest.options.headers["x-goog-api-key"], "gemini-secret");
     assert.deepEqual(JSON.parse(upstreamRequest.options.body), {
@@ -125,6 +125,59 @@ test("AI chat retries a transient Gemini overload response", async () => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { content: "recovered" });
     assert.equal(attempts, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("AI chat falls back to Flash when Flash-Lite quota is exhausted", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedModels = [];
+
+  globalThis.fetch = async (request) => {
+    const url = String(request);
+    requestedModels.push(url);
+
+    if (url.includes("gemini-2.5-flash-lite")) {
+      return Response.json(
+        {
+          error: {
+            code: 429,
+            message: "Quota exceeded",
+            status: "RESOURCE_EXHAUSTED",
+          },
+        },
+        { status: 429 },
+      );
+    }
+
+    return Response.json({
+      candidates: [{
+        content: {
+          parts: [{ text: "fallback answer" }],
+        },
+      }],
+    });
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://worker.test/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "question" }],
+        }),
+      }),
+      { GEMINI_API_KEY: "gemini-secret" },
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { content: "fallback answer" });
+    assert.deepEqual(
+      requestedModels.map((url) => url.match(/models\/([^:]+)/)?.[1]),
+      ["gemini-2.5-flash-lite", "gemini-2.5-flash"],
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

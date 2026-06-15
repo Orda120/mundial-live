@@ -145,15 +145,18 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
 const GEMINI_MAX_ATTEMPTS = 3;
-const GEMINI_RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const GEMINI_RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
+
+function geminiUrl(model) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+}
 
 function retryDelayMs(response, attempt) {
   const retryAfter = response.headers.get("Retry-After");
   const retryAfterSeconds = Number(retryAfter);
-  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+  if (retryAfter !== null && Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
     return Math.min(retryAfterSeconds * 1000, 5000);
   }
   return 300 * (2 ** attempt);
@@ -161,16 +164,16 @@ function retryDelayMs(response, attempt) {
 
 async function fetchGemini(options) {
   let response;
-  for (let attempt = 0; attempt < GEMINI_MAX_ATTEMPTS; attempt += 1) {
-    response = await fetch(GEMINI_URL, options);
-    if (
-      response.ok ||
-      !GEMINI_RETRYABLE_STATUSES.has(response.status) ||
-      attempt === GEMINI_MAX_ATTEMPTS - 1
-    ) {
-      return response;
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt < GEMINI_MAX_ATTEMPTS; attempt += 1) {
+      response = await fetch(geminiUrl(model), options);
+      if (response.ok) return response;
+      if (response.status === 429) break;
+      if (!GEMINI_RETRYABLE_STATUSES.has(response.status)) return response;
+      if (attempt < GEMINI_MAX_ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs(response, attempt)));
+      }
     }
-    await new Promise((resolve) => setTimeout(resolve, retryDelayMs(response, attempt)));
   }
   return response;
 }
