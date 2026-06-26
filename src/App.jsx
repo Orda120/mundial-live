@@ -25,8 +25,13 @@ import {
   GROUPS,
   groupFixtures,
 } from "./worldCupData";
-import { assignOfficialThirds } from "./thirdPlaceMatrix";
 import { buildTeamTournamentRows } from "./teamStandings";
+import {
+  buildKnockoutSchedule,
+  buildScheduledBracketKo,
+  FEED,
+  TREE_COLS,
+} from "./bracketSchedule";
 
 /* ================= DATA — World Cup 2026 (final groups, post-playoffs) ================= */
 
@@ -1531,6 +1536,7 @@ function ManageTab({
   const [newName, setNewName] = useState("");
   const [confirmReset, setConfirmReset] = useState(0);
   const [newKo, setNewKo] = useState({ round: "r32", t1: "", t2: "" });
+  const knockoutSchedule = useMemo(() => buildKnockoutSchedule(resDraft), [resDraft]);
 
   const setGroupRes = (fid, v) =>
     setResDraft((prev) => {
@@ -1550,8 +1556,19 @@ function ManageTab({
     setNewKo({ round: newKo.round, t1: "", t2: "" });
   };
 
-  const patchKo = (id, patch) =>
-    setResDraft((prev) => ({ ...prev, ko: { ...prev.ko, [id]: { ...prev.ko[id], ...patch } } }));
+  const patchKo = (matchOrId, patch) => {
+    const id = typeof matchOrId === "string" ? matchOrId : matchOrId.id;
+    const base = typeof matchOrId === "string"
+      ? {}
+      : {
+        round: matchOrId.round,
+        matchNo: matchOrId.matchNo,
+        scheduled: matchOrId.scheduled,
+        t1: matchOrId.t1,
+        t2: matchOrId.t2,
+      };
+    setResDraft((prev) => ({ ...prev, ko: { ...prev.ko, [id]: { ...base, ...prev.ko[id], ...patch } } }));
+  };
   const delKo = (id) =>
     setResDraft((prev) => {
       const ko = { ...prev.ko }; delete ko[id]; return { ...prev, ko };
@@ -1689,7 +1706,11 @@ function ManageTab({
 
       <Section title="משחקי נוקאאוט ותוצאות">
         <div className="mb-3 rounded-xl border border-slate-800 bg-slate-950 p-3">
-          <div className="mb-2 text-xs font-bold text-slate-300">הוספת משחק (כשההצלבה נקבעת)</div>
+          <div className="mb-2 text-xs font-bold text-slate-300">כל משחקי הנוקאאוט מוצגים מראש</div>
+          <p className="mb-3 text-xs text-slate-500">
+            מקומות שעוד לא נקבעו מופיעים כ־Winner Group / 3rd Group / Winner Match. אחרי שהנבחרות ידועות אפשר לבחור מנצחת ולשמור תוצאה אמיתית.
+          </p>
+          <div className="mb-2 text-xs font-bold text-slate-400">הוספת משחק ידני</div>
           <div className="flex flex-col gap-1.5">
             <select
               value={newKo.round}
@@ -1709,38 +1730,66 @@ function ManageTab({
         </div>
         <div className="flex flex-col gap-2">
           {KO_ROUNDS.map((r) => {
-            const ms = Object.entries(resDraft.ko || {}).filter(([, m]) => m.round === r.k).sort((a, b) => a[0].localeCompare(b[0]));
+            const ms = knockoutSchedule
+              .filter((m) => m.round === r.k)
+              .sort((a, b) => (a.matchNo || 999) - (b.matchNo || 999) || a.id.localeCompare(b.id));
             if (ms.length === 0) return null;
             return (
               <div key={r.k}>
                 <div className="mb-1 text-xs font-bold text-slate-400">{r.n}</div>
                 <div className="flex flex-col gap-1.5">
-                  {ms.map(([id, m]) => (
-                    <div key={id} className="rounded-xl border border-slate-800 bg-slate-950 p-2">
+                  {ms.map((m) => (
+                    <div key={m.id} className="rounded-xl border border-slate-800 bg-slate-950 p-2">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-500">
+                          {m.matchNo ? <span className="font-mono">Match {m.matchNo}</span> : "משחק ידני"}
+                          {m.scheduled
+                            ? <span className="mr-1.5 text-sky-400">· מסלול רשמי</span>
+                            : <span className="mr-1.5 text-slate-500">· ידני</span>}
+                        </span>
+                        {!m.scheduled && (
+                          <button onClick={() => delKo(m.id)} className="shrink-0 text-slate-600 hover:text-rose-400"><Trash2 size={14} /></button>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1.5">
-                        {[m.t1, m.t2].map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => patchKo(id, { w: m.w === t ? null : t })}
-                            className={
-                              "flex flex-1 items-center justify-center gap-1 truncate rounded-lg border px-2 py-1.5 text-xs " +
-                              (m.w === t ? "border-emerald-500 bg-emerald-500 bg-opacity-20 text-emerald-300" : "border-slate-700 text-slate-300 hover:border-slate-500")
-                            }
-                          >
-                            <Flag code={t} /><TName code={t} /> {m.w === t && "🏆"}
-                          </button>
-                        ))}
-                        <button onClick={() => delKo(id)} className="shrink-0 text-slate-600 hover:text-rose-400"><Trash2 size={14} /></button>
+                        {[
+                          { side: "t1", competitor: m.a },
+                          { side: "t2", competitor: m.b },
+                        ].map(({ side, competitor }) => {
+                          const t = competitor.team;
+                          return (
+                            <button
+                              key={side}
+                              disabled={!t}
+                              onClick={() => patchKo(m, { w: m.w === t ? null : t })}
+                              className={
+                                "flex flex-1 items-center justify-center gap-1 truncate rounded-lg border px-2 py-1.5 text-xs " +
+                                (!t
+                                  ? "cursor-default border-slate-800 text-slate-500"
+                                  : m.w === t
+                                    ? "border-emerald-500 bg-emerald-500 bg-opacity-20 text-emerald-300"
+                                    : "border-slate-700 text-slate-300 hover:border-slate-500")
+                              }
+                            >
+                              <CompetitorName competitor={competitor} /> {t && m.w === t && "🏆"}
+                            </button>
+                          );
+                        })}
                       </div>
                       <div className="mt-1.5 flex items-center gap-1.5">
                         <span className="text-xs text-slate-500">הוכרע:</span>
                         {[["90", "ב־90 דק׳"], ["et", "הארכה/פנדלים"]].map(([v, label]) => (
                           <button
                             key={v}
-                            onClick={() => patchKo(id, { p: m.p === v ? null : v })}
+                            disabled={!m.w}
+                            onClick={() => patchKo(m, { p: m.p === v ? null : v })}
                             className={
                               "flex-1 rounded-lg border px-2 py-1 text-xs " +
-                              (m.p === v ? "border-emerald-500 text-emerald-300" : "border-slate-700 text-slate-400 hover:border-slate-500")
+                              (m.p === v
+                                ? "border-emerald-500 text-emerald-300"
+                                : !m.w
+                                  ? "border-slate-800 text-slate-700"
+                                  : "border-slate-700 text-slate-400 hover:border-slate-500")
                             }
                           >{label}</button>
                         ))}
@@ -1970,105 +2019,28 @@ function computeQualification(gRes) {
   };
 }
 
-/* ---- official FIFA 2026 bracket (match numbers 73–104) ---- */
-const R32_SLOTS = [
-  { m: 73, a: "2A", b: "2B" }, { m: 74, a: "1E", b: "3ABCDF" },
-  { m: 75, a: "1F", b: "2C" }, { m: 76, a: "1C", b: "2F" },
-  { m: 77, a: "1I", b: "3CDFGH" }, { m: 78, a: "2E", b: "2I" },
-  { m: 79, a: "1A", b: "3CEFHI" }, { m: 80, a: "1L", b: "3EHIJK" },
-  { m: 81, a: "1D", b: "3BEFIJ" }, { m: 82, a: "1G", b: "3AEHIJ" },
-  { m: 83, a: "2K", b: "2L" }, { m: 84, a: "1H", b: "2J" },
-  { m: 85, a: "1B", b: "3EFGIJ" }, { m: 86, a: "1J", b: "2H" },
-  { m: 87, a: "1K", b: "3DEIJL" }, { m: 88, a: "2D", b: "2G" },
-];
-const NEXT_ROUNDS = [
-  { k: "r16", slots: [{ m: 89, a: 74, b: 77 }, { m: 90, a: 73, b: 75 }, { m: 91, a: 76, b: 78 }, { m: 92, a: 79, b: 80 }, { m: 93, a: 83, b: 84 }, { m: 94, a: 81, b: 82 }, { m: 95, a: 86, b: 88 }, { m: 96, a: 85, b: 87 }] },
-  { k: "qf", slots: [{ m: 97, a: 89, b: 90 }, { m: 98, a: 93, b: 94 }, { m: 99, a: 91, b: 92 }, { m: 100, a: 95, b: 96 }] },
-  { k: "sf", slots: [{ m: 101, a: 97, b: 98 }, { m: 102, a: 99, b: 100 }] },
-];
-
-const sameM = (x, y) =>
-  x.round === y.round && x.t1 === y.t1 && x.t2 === y.t2 &&
-  (x.w || null) === (y.w || null) && (x.p || null) === (y.p || null);
-const koEqual = (a, b) => {
-  const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
-  return ka.length === kb.length && ka.every((k, i) => kb[i] === k && sameM(a[k], b[k]));
-};
-
-/* (re)derive the scenario's knockout tree from group standings + chosen winners.
-   real / manually-added matches are adopted into slots when they fit; only sim-b-* ids are managed. */
-function deriveBracket(sim) {
-  const baseKo = {};
-  Object.entries(sim.ko).forEach(([id, m]) => { if (!id.startsWith("sim-b-")) baseKo[id] = { ...m }; });
-  const qual = computeQualification(sim.g);
-  if (!qual.complete) {
-    return { ko: koEqual(baseKo, sim.ko) ? sim.ko : baseKo, refs: {} };
-  }
-
-  const thirdMap = assignOfficialThirds(qual.thirdsRanked.slice(0, 8).map((x) => x.g));
-  const teamOf = (tok, m) =>
-    tok[0] === "1" ? qual.st[tok[1]].order[0]
-      : tok[0] === "2" ? qual.st[tok[1]].order[1]
-        : thirdMap[m] ? qual.st[thirdMap[m]].order[2] : null;
-
-  const out = { ...baseKo };
-  const refOf = {};
-  const findExisting = (rk, tA, tB) => {
-    const es = Object.entries(baseKo).filter(([, m]) => m.round === rk);
-    const used = new Set(Object.values(refOf));
-    const setEq = es.find(([id, m]) => !used.has(id) && ((m.t1 === tA && m.t2 === tB) || (m.t1 === tB && m.t2 === tA)));
-    if (setEq) return setEq[0];
-    const anchor = es.find(([id, m]) => !used.has(id) && (m.t1 === tA || m.t2 === tA || m.t1 === tB || m.t2 === tB));
-    return anchor ? anchor[0] : null;
-  };
-  const ensure = (rk, m, tA, tB) => {
-    if (!tA || !tB) return;
-    const existing = findExisting(rk, tA, tB);
-    if (existing) { refOf[m] = existing; return; }
-    const id = "sim-b-" + m;
-    const prev = sim.ko[id];
-    out[id] = prev && ((prev.t1 === tA && prev.t2 === tB) || (prev.t1 === tB && prev.t2 === tA))
-      ? { ...prev }
-      : { round: rk, t1: tA, t2: tB, w: null, p: null };
-    refOf[m] = id;
-  };
-  const winnerOf = (m) => { const mm = refOf[m] && out[refOf[m]]; return mm && mm.w ? mm.w : null; };
-  const loserOf = (m) => { const mm = refOf[m] && out[refOf[m]]; return mm && mm.w ? (mm.w === mm.t1 ? mm.t2 : mm.t1) : null; };
-
-  R32_SLOTS.forEach((s) => ensure("r32", s.m, teamOf(s.a, s.m), teamOf(s.b, s.m)));
-  NEXT_ROUNDS.forEach(({ k, slots }) => slots.forEach((s) => ensure(k, s.m, winnerOf(s.a), winnerOf(s.b))));
-  ensure("f", 104, winnerOf(101), winnerOf(102));
-  ensure("p3", 103, loserOf(101), loserOf(102));
-
-  return { ko: koEqual(out, sim.ko) ? sim.ko : out, refs: refOf };
-}
-function buildBracketKo(sim) { return deriveBracket(sim).ko; }
-
-/* tree-chart layout: column order follows the official progression so siblings sit adjacent */
-const TREE_COLS = [
-  { k: "r32", n: "שלב ה־32", ms: [74, 77, 73, 75, 83, 84, 81, 82, 76, 78, 79, 80, 86, 88, 85, 87] },
-  { k: "r16", n: "שמינית", ms: [89, 90, 93, 94, 91, 92, 95, 96] },
-  { k: "qf", n: "רבע גמר", ms: [97, 98, 99, 100] },
-  { k: "sf", n: "חצי גמר", ms: [101, 102] },
-  { k: "f", n: "הגמר", ms: [104] },
-];
-const FEED = {
-  89: [74, 77], 90: [73, 75], 91: [76, 78], 92: [79, 80],
-  93: [83, 84], 94: [81, 82], 95: [86, 88], 96: [85, 87],
-  97: [89, 90], 98: [93, 94], 99: [91, 92], 100: [95, 96],
-  101: [97, 98], 102: [99, 100], 104: [101, 102], 103: [101, 102],
-};
-
 /* ================= TREE CHART ================= */
 
-function TreeChart({ sim, refs, realKo, patchKo }) {
-  const fMatch = refs[104] && sim.ko[refs[104]];
+function CompetitorName({ competitor, className = "" }) {
+  if (competitor?.team) {
+    return (
+      <>
+        <Flag code={competitor.team} />
+        <span className={"truncate " + className}><TName code={competitor.team} /></span>
+      </>
+    );
+  }
+  return <span className={"truncate text-slate-500 " + className} dir="ltr">{competitor?.label || "TBD"}</span>;
+}
+
+function TreeChart({ schedule, realKo, patchKo }) {
+  const byMatchNo = useMemo(() => new Map(schedule.map((match) => [match.matchNo, match])), [schedule]);
+  const fMatch = byMatchNo.get(104);
   const champion = fMatch && fMatch.w ? fMatch.w : null;
-  const Card = ({ m }) => {
-    const id = refs[m];
-    const mm = id && sim.ko[id];
+  const Card = ({ matchNo }) => {
+    const mm = byMatchNo.get(matchNo);
     if (!mm) {
-      const fd = FEED[m];
+      const fd = FEED[matchNo];
       return (
         <div className="flex w-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-800 px-1.5 py-1.5 text-xs text-slate-700">
           <span>מנצחות</span>
@@ -2076,25 +2048,35 @@ function TreeChart({ sim, refs, realKo, patchKo }) {
         </div>
       );
     }
-    const locked = !!realKo[id]?.w;
+    const locked = !!realKo[mm.id]?.w;
     return (
       <div className="w-28 overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
-        {[mm.t1, mm.t2].map((t) => (
+        {[
+          { side: "t1", competitor: mm.a },
+          { side: "t2", competitor: mm.b },
+        ].map(({ side, competitor }) => {
+          const t = competitor.team;
+          const disabled = locked || !t;
+          return (
           <button
-            key={t} disabled={locked}
-            onClick={() => patchKo(id, { w: mm.w === t ? null : t })}
+            key={side}
+            disabled={disabled}
+            onClick={() => patchKo(mm, { w: mm.w === t ? null : t })}
             className={
               "flex w-full items-center gap-1 px-1.5 py-0.5 text-right text-xs " +
-              (mm.w === t
+              (!t
+                ? "cursor-default text-slate-500"
+                : mm.w === t
                 ? locked
                   ? "bg-emerald-500 bg-opacity-20 font-bold text-emerald-200"
                   : "bg-sky-500 bg-opacity-20 font-bold text-sky-100"
                 : mm.w ? "text-slate-600" : "text-slate-300 hover:bg-slate-800")
             }
           >
-            <Flag code={t} /><span className="truncate">{T[t][0]}</span>
+            <CompetitorName competitor={competitor} />
           </button>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -2111,12 +2093,12 @@ function TreeChart({ sim, refs, realKo, patchKo }) {
             <div key={col.k} className="flex flex-col">
               <div className="mb-1.5 text-center text-xs font-bold text-slate-500">{col.n}</div>
               <div className="flex flex-1 flex-col justify-around gap-2">
-                {col.ms.map((m) => <Card key={m} m={m} />)}
+                {col.ms.map((m) => <Card key={m} matchNo={m} />)}
               </div>
               {col.k === "f" && (
                 <div className="pt-3">
                   <div className="mb-1 text-center text-xs text-slate-600">מקום שלישי</div>
-                  <Card m={103} />
+                  <Card matchNo={103} />
                 </div>
               )}
             </div>
@@ -2135,13 +2117,13 @@ function SimTab({ config, results, betsAll, meId }) {
   useEffect(() => { setSim((s) => mergeRealIntoSim(results, s)); }, [results]);
   useEffect(() => {
     setSim((s) => {
-      const ko = buildBracketKo(s);
-      return ko === s.ko ? s : { ...s, ko };
+      const ko = buildScheduledBracketKo(s);
+      return JSON.stringify(ko) === JSON.stringify(s.ko) ? s : { ...s, ko };
     });
   }, [sim]);
   const [newKo, setNewKo] = useState({ round: "r32", t1: "", t2: "" });
   const qual = useMemo(() => computeQualification(sim.g), [sim.g]);
-  const bracketRefs = useMemo(() => deriveBracket(sim).refs, [sim]);
+  const knockoutSchedule = useMemo(() => buildKnockoutSchedule(sim), [sim]);
 
   const realG = results?.g || {};
   const realKo = results?.ko || {};
@@ -2156,9 +2138,19 @@ function SimTab({ config, results, betsAll, meId }) {
     if (realG[id]) return;
     setSim((s) => { const g = { ...s.g }; if (v == null) delete g[id]; else g[id] = v; return { ...s, g }; });
   };
-  const patchKo = (id, patch) => {
+  const patchKo = (matchOrId, patch) => {
+    const id = typeof matchOrId === "string" ? matchOrId : matchOrId.id;
     if (realKo[id]?.w) return;
-    setSim((s) => ({ ...s, ko: { ...s.ko, [id]: { ...s.ko[id], ...patch } } }));
+    const base = typeof matchOrId === "string"
+      ? {}
+      : {
+        round: matchOrId.round,
+        matchNo: matchOrId.matchNo,
+        scheduled: matchOrId.scheduled,
+        t1: matchOrId.t1,
+        t2: matchOrId.t2,
+      };
+    setSim((s) => ({ ...s, ko: { ...s.ko, [id]: { ...base, ...s.ko[id], ...patch } } }));
   };
   const addKo = () => {
     if (!newKo.t1 || !newKo.t2 || newKo.t1 === newKo.t2) return;
@@ -2186,12 +2178,11 @@ function SimTab({ config, results, betsAll, meId }) {
     });
   };
 
-  const koList = Object.entries(sim.ko).map(([id, m]) => ({ id, ...m }));
+  const koList = [...knockoutSchedule];
   const roundOrder = Object.fromEntries(KO_ROUNDS.map((r, i) => [r.k, i]));
-  const mNum = (id) => (id.startsWith("sim-b-") ? +id.slice(6) : 999);
   koList.sort((a, b) =>
     (roundOrder[a.round] ?? 9) - (roundOrder[b.round] ?? 9) ||
-    mNum(a.id) - mNum(b.id) ||
+    (a.matchNo || 999) - (b.matchNo || 999) ||
     a.id.localeCompare(b.id));
   const roundName = (k) => KO_ROUNDS.find((r) => r.k === k)?.n || k;
 
@@ -2203,7 +2194,7 @@ function SimTab({ config, results, betsAll, meId }) {
           <h3 className="font-bold text-slate-100">מגרש משחקים</h3>
         </div>
         <p className="mb-3 text-xs text-slate-400">
-          תוצאות אמיתיות שכבר הוזנו נעולות (בירוק). כל השאר אפשר למלא כרצונכם ולראות איך הטבלה משתנה לפי ההימורים של כולם. כשכל הבתים מלאים, נבנה אוטומטית עץ נוקאאוט שלם לפי המסלול הרשמי — מי עולה מכל בית, השלישיות הטובות, ומשחק אחר משחק עד הגמר. הסימולציה מקומית בלבד — לא נשמרת ולא משפיעה על הליגה.
+          תוצאות אמיתיות שכבר הוזנו נעולות (בירוק). כל השאר אפשר למלא כרצונכם ולראות איך הטבלה משתנה לפי ההימורים של כולם. עץ הנוקאאוט מוצג מראש לפי המסלול הרשמי — מקומות שעוד לא נקבעו מופיעים כ־Winner Group / 3rd Group / Winner Match. הסימולציה מקומית בלבד — לא נשמרת ולא משפיעה על הליגה.
         </p>
         <div className="flex flex-wrap gap-2">
           {meId && betsAll[meId] && (
@@ -2265,7 +2256,7 @@ function SimTab({ config, results, betsAll, meId }) {
       <Section title="טבלאות הבתים — מי עולה" defaultOpen badge={`${qual.filled}/72`}>
         {!qual.complete && (
           <p className="mb-2 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-400">
-            עץ הנוקאאוט ייבנה אוטומטית לפי המסלול הרשמי ברגע שכל 72 משחקי הבתים ימולאו — "מלא לפי ההימורים שלי" עושה את רוב העבודה.
+            עץ הנוקאאוט כבר מוצג למטה עם שמות המקומות הצפויים. ברגע שבתים או משחקים קודמים מוכרעים, המקומות מתחלפים אוטומטית לנבחרות האמיתיות.
           </p>
         )}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -2299,30 +2290,21 @@ function SimTab({ config, results, betsAll, meId }) {
       </Section>
 
       <Section title="עץ הטורניר — תרחיש" defaultOpen sub="לחיצה על נבחרת קובעת מנצחת">
-        {!qual.complete ? (
-          <p className="text-xs text-slate-600">העץ יופיע כשכל 72 משחקי הבתים ימולאו.</p>
-        ) : (
-          <TreeChart sim={sim} refs={bracketRefs} realKo={realKo} patchKo={patchKo} />
-        )}
+        <TreeChart schedule={knockoutSchedule} realKo={realKo} patchKo={patchKo} />
       </Section>
 
       <Section title="נוקאאוט — תרחיש" sub="העץ נבנה לבד מהבתים; בחרו מנצחת והסיבוב הבא ייווצר" defaultOpen>
         <div className="flex flex-col gap-2">
-          {koList.length === 0 && (
-            <p className="text-xs text-slate-600">
-              עדיין אין משחקי נוקאאוט בתרחיש — מלאו את כל הבתים והעץ יופיע כאן, או הוסיפו משחק ידנית למטה.
-            </p>
-          )}
           {koList.map((m) => {
             const isReal = !!realKo[m.id];
-            const isAuto = m.id.startsWith("sim-b-");
+            const isAuto = !!m.scheduled;
             const locked = !!realKo[m.id]?.w;
             return (
               <div key={m.id} className="rounded-xl border border-slate-800 bg-slate-950 p-2.5">
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-400">
                     {roundName(m.round)}
-                    {isAuto && <span className="mr-1.5 font-mono text-slate-600">· משחק {m.id.slice(6)}</span>}
+                    {m.matchNo && <span className="mr-1.5 font-mono text-slate-600">· משחק {m.matchNo}</span>}
                     {isReal
                       ? <span className="mr-1.5 text-emerald-500">· אמיתי</span>
                       : isAuto
@@ -2336,35 +2318,45 @@ function SimTab({ config, results, betsAll, meId }) {
                     )}
                 </div>
                 <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                  {[m.t1, m.t2].map((t) => (
+                  {[
+                    { side: "t1", competitor: m.a },
+                    { side: "t2", competitor: m.b },
+                  ].map(({ side, competitor }) => {
+                    const t = competitor.team;
+                    const disabled = locked || !t;
+                    return (
                     <button
-                      key={t} disabled={locked}
-                      onClick={() => patchKo(m.id, { w: m.w === t ? null : t })}
+                      key={side}
+                      disabled={disabled}
+                      onClick={() => patchKo(m, { w: m.w === t ? null : t })}
                       className={
                         "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs " +
-                        (m.w === t
+                        (!t
+                          ? "cursor-default border-slate-800 text-slate-500"
+                          : m.w === t
                           ? locked
                             ? "border-emerald-500 bg-emerald-500 bg-opacity-20 text-emerald-200"
                             : "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-100"
                           : locked ? "border-slate-800 text-slate-600" : "border-slate-700 text-slate-300 hover:border-slate-500")
                       }
                     >
-                      <Flag code={t} /><TName code={t} /> {m.w === t && "🏆"}
+                      <CompetitorName competitor={competitor} /> {t && m.w === t && "🏆"}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="flex items-center gap-1.5">
                   {[["90", "ב־90 דק׳"], ["et", "הארכה/פנדלים"]].map(([v, n]) => (
                     <button
-                      key={v} disabled={locked}
-                      onClick={() => patchKo(m.id, { p: m.p === v ? null : v })}
+                      key={v} disabled={locked || !m.w}
+                      onClick={() => patchKo(m, { p: m.p === v ? null : v })}
                       className={
                         "rounded-lg border px-2 py-0.5 text-xs " +
                         (m.p === v
                           ? locked
                             ? "border-emerald-500 text-emerald-300"
                             : "border-sky-400 text-sky-200"
-                          : locked ? "border-slate-800 text-slate-700" : "border-slate-700 text-slate-400 hover:border-slate-500")
+                          : locked || !m.w ? "border-slate-800 text-slate-700" : "border-slate-700 text-slate-400 hover:border-slate-500")
                       }
                     >
                       {n}
