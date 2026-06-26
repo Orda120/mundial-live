@@ -771,7 +771,7 @@ function TeamsTab({ config, rows }) {
         </div>
         <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
           <div className="text-[11px] text-slate-500">סה"כ קבוצות</div>
-          <div className="font-mono text-lg font-black text-sky-300">{row.length}</div>
+          <div className="font-mono text-lg font-black text-sky-300">{rows.length}</div>
         </div>
       </div>
 
