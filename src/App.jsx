@@ -757,16 +757,16 @@ function TeamsTab({ config, rows }) {
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-3 gap-2">
         <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
-          <div className="text-[11px] text-slate-500">Total teams</div>
-          <div className="font-mono text-lg font-black text-emerald-300">{rows.length}</div>
+          <div className="text-[11px] text-slate-500">עדיין במשחק</div>
+          <div className="font-mono text-lg font-black text-emerald-300">{activeCount}</div>
         </div>
         <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
           <div className="text-[11px] text-slate-500">הודחו</div>
           <div className="font-mono text-lg font-black text-rose-300">{eliminatedCount}</div>
         </div>
         <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
-          <div className="text-[11px] text-slate-500">Still in play</div>
-          <div className="font-mono text-lg font-black text-sky-300">{activeCount}</div>
+          <div className="text-[11px] text-slate-500">סה"כ קבוצות</div>
+          <div className="font-mono text-lg font-black text-sky-300">{row.length}</div>
         </div>
       </div>
 
