@@ -9,6 +9,7 @@
     "prebuild": "node scripts/applyScoreBreakdownPatch.mjs",
     "build": "vite build",
     "preview": "vite preview",
+    "retrieve:third-place-matrix": "python scripts/retrieveThirdPlaceMatrix.py",
     "test": "node --test"
   },
   "dependencies": {

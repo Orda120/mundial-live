@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Trophy, RefreshCw, Check, X, Plus, Trash2, ChevronDown, ChevronLeft,
   Lock, Unlock, Users, Target, Shuffle, Settings, BookOpen, Undo2, AlertTriangle, Pencil, FlaskConical, Link2,
-  Bot, Send, MessageSquare,
+  Bot, Send, MessageSquare, ListOrdered, ShieldX,
 } from "lucide-react";
 import { dbReady, sSet, sUpdate, sDel, sTx, subscribe, subscribeConnected } from "./db";
 import { resolveAiWorkerUrl } from "./aiConfig";
@@ -25,6 +25,8 @@ import {
   GROUPS,
   groupFixtures,
 } from "./worldCupData";
+import { assignOfficialThirds } from "./thirdPlaceMatrix";
+import { buildTeamTournamentRows } from "./teamStandings";
 
 /* ================= DATA — World Cup 2026 (final groups, post-playoffs) ================= */
 
@@ -64,11 +66,11 @@ const _uj = [
 const FLAGS = {
   MEX: [..._v("#006847", "#fff", "#ce1126"), ["c", 15, 10, 2.3, "#8c6239"]],
   KOR: [["r", 0, 0, 30, 20, "#fff"], ["c", 15, 10, 5.4, "#cd2e3a"], ["d", "M9.6,10a5.4,5.4 0 0 0 10.8,0z", "#0047a0"],
-    ["r", 3, 3, 4.5, 1, "#000"], ["r", 3, 4.8, 4.5, 1, "#000"], ["r", 3, 6.6, 4.5, 1, "#000"],
-    ["r", 22.5, 12.4, 4.5, 1, "#000"], ["r", 22.5, 14.2, 4.5, 1, "#000"], ["r", 22.5, 16, 4.5, 1, "#000"]],
+  ["r", 3, 3, 4.5, 1, "#000"], ["r", 3, 4.8, 4.5, 1, "#000"], ["r", 3, 6.6, 4.5, 1, "#000"],
+  ["r", 22.5, 12.4, 4.5, 1, "#000"], ["r", 22.5, 14.2, 4.5, 1, "#000"], ["r", 22.5, 16, 4.5, 1, "#000"]],
   CZE: [..._h("#fff", "#d7141a"), ["p", "0,0 13,10 0,20", "#11457e"]],
   RSA: [["r", 0, 0, 30, 10, "#e03c31"], ["r", 0, 10, 30, 10, "#001489"], ["r", 0, 6.2, 30, 7.6, "#fff"], ["r", 0, 7.8, 30, 4.4, "#007749"],
-    ["p", "0,0 12,10 0,20", "#fff"], ["p", "0,1.8 9.8,10 0,18.2", "#ffb81c"], ["p", "0,3.6 7.7,10 0,16.4", "#000"]],
+  ["p", "0,0 12,10 0,20", "#fff"], ["p", "0,1.8 9.8,10 0,18.2", "#ffb81c"], ["p", "0,3.6 7.7,10 0,16.4", "#000"]],
   SUI: [["r", 0, 0, 30, 20, "#da291c"], ["r", 13, 4.5, 4, 11, "#fff"], ["r", 9.5, 8, 11, 4, "#fff"]],
   CAN: [["r", 0, 0, 30, 20, "#fff"], ["r", 0, 0, 7.5, 20, "#d80621"], ["r", 22.5, 0, 7.5, 20, "#d80621"], _st(15, 9.3, 4.4, "#d80621"), ["r", 14.5, 12, 1, 3.2, "#d80621"]],
   QAT: [["r", 0, 0, 30, 20, "#8d1b3d"], ["p", "0,0 8,0 10,1.1 8,2.2 10,3.3 8,4.4 10,5.6 8,6.7 10,7.8 8,8.9 10,10 8,11.1 10,12.2 8,13.3 10,14.4 8,15.6 10,16.7 8,17.8 10,18.9 8,20 0,20", "#fff"]],
@@ -78,9 +80,9 @@ const FLAGS = {
   HAI: [..._h("#00209f", "#d21034"), ["r", 11, 6.8, 8, 6.4, "#fff"], ["c", 15, 10, 1.5, "#016a16"]],
   SCO: [["r", 0, 0, 30, 20, "#005eb8"], ["l", 0, 0, 30, 20, "#fff", 3.6], ["l", 30, 0, 0, 20, "#fff", 3.6]],
   USA: [..._h("#b22234", "#fff", "#b22234", "#fff", "#b22234", "#fff", "#b22234"), ["r", 0, 0, 13.5, 8.8, "#3c3b6e"],
-    ["c", 2.5, 2.2, 0.7, "#fff"], ["c", 6.7, 2.2, 0.7, "#fff"], ["c", 10.9, 2.2, 0.7, "#fff"],
-    ["c", 4.6, 4.4, 0.7, "#fff"], ["c", 8.8, 4.4, 0.7, "#fff"],
-    ["c", 2.5, 6.6, 0.7, "#fff"], ["c", 6.7, 6.6, 0.7, "#fff"], ["c", 10.9, 6.6, 0.7, "#fff"]],
+  ["c", 2.5, 2.2, 0.7, "#fff"], ["c", 6.7, 2.2, 0.7, "#fff"], ["c", 10.9, 2.2, 0.7, "#fff"],
+  ["c", 4.6, 4.4, 0.7, "#fff"], ["c", 8.8, 4.4, 0.7, "#fff"],
+  ["c", 2.5, 6.6, 0.7, "#fff"], ["c", 6.7, 6.6, 0.7, "#fff"], ["c", 10.9, 6.6, 0.7, "#fff"]],
   TUR: [["r", 0, 0, 30, 20, "#e30a17"], ["c", 11.5, 10, 5.2, "#fff"], ["c", 12.8, 10, 4.2, "#e30a17"], _st(18.6, 10, 2.3, "#fff")],
   AUS: [["r", 0, 0, 30, 20, "#00247d"], ..._uj, _st(7.5, 15.5, 2.3, "#fff"), _st(22, 4.5, 1.4, "#fff"), _st(26.3, 8.5, 1.4, "#fff"), _st(21.5, 12.5, 1.4, "#fff"), _st(24.5, 17, 1.3, "#fff"), _st(19, 9.5, 0.9, "#fff")],
   PAR: [..._h("#d52b1e", "#fff", "#0038a8"), ["c", 15, 10, 2.3, "#fcd116"], ["c", 15, 10, 1.6, "#fff"], _st(15, 10, 1.3, "#009b3a")],
@@ -98,7 +100,7 @@ const FLAGS = {
   NZL: [["r", 0, 0, 30, 20, "#00247d"], ..._uj, _st(22, 5, 1.5, "#cc142b"), _st(26, 9, 1.5, "#cc142b"), _st(21.5, 12.5, 1.5, "#cc142b"), _st(23.8, 16.5, 1.3, "#cc142b")],
   ESP: [["r", 0, 0, 30, 5, "#aa151b"], ["r", 0, 5, 30, 10, "#f1bf00"], ["r", 0, 15, 30, 5, "#aa151b"], ["r", 7.4, 8, 3, 4, "#aa151b"], ["c", 8.9, 8, 1.1, "#f1bf00"]],
   CPV: [["r", 0, 0, 30, 20, "#003893"], ["r", 0, 12, 30, 1.7, "#fff"], ["r", 0, 13.7, 30, 1.7, "#cf2027"], ["r", 0, 15.4, 30, 1.7, "#fff"],
-    ["c", 11, 10.5, 0.7, "#f7d116"], ["c", 13.4, 11.5, 0.7, "#f7d116"], ["c", 14.4, 14, 0.7, "#f7d116"], ["c", 13.4, 16.5, 0.7, "#f7d116"], ["c", 11, 17.5, 0.7, "#f7d116"], ["c", 8.6, 16.5, 0.7, "#f7d116"], ["c", 7.6, 14, 0.7, "#f7d116"], ["c", 8.6, 11.5, 0.7, "#f7d116"]],
+  ["c", 11, 10.5, 0.7, "#f7d116"], ["c", 13.4, 11.5, 0.7, "#f7d116"], ["c", 14.4, 14, 0.7, "#f7d116"], ["c", 13.4, 16.5, 0.7, "#f7d116"], ["c", 11, 17.5, 0.7, "#f7d116"], ["c", 8.6, 16.5, 0.7, "#f7d116"], ["c", 7.6, 14, 0.7, "#f7d116"], ["c", 8.6, 11.5, 0.7, "#f7d116"]],
   KSA: [["r", 0, 0, 30, 20, "#006c35"], ["r", 7, 7, 16, 1, "#fff"], ["r", 9, 9, 12, 1, "#fff"], ["r", 8, 12.6, 12, 1.1, "#fff"], ["r", 20.5, 12.1, 2.2, 2.1, "#fff"]],
   URU: [..._h("#fff", "#0038a8", "#fff", "#0038a8", "#fff", "#0038a8", "#fff", "#0038a8", "#fff"), ["r", 0, 0, 13.4, 11.2, "#fff"], _st(6.5, 5.5, 3.4, "#fcd116"), ["c", 6.5, 5.5, 2.2, "#fcd116"]],
   FRA: _v("#002395", "#fff", "#ed2939"),
@@ -112,14 +114,14 @@ const FLAGS = {
   POR: [["r", 0, 0, 12, 20, "#046a38"], ["r", 12, 0, 18, 20, "#da291c"], ["c", 12, 10, 3.3, "#ffe900"], ["c", 12, 10, 1.9, "#fff"], ["r", 11.1, 9.1, 1.8, 1.8, "#da291c"]],
   COD: [["r", 0, 0, 30, 20, "#007fff"], ["l", -2, 21.5, 32, -1.5, "#f7d618", 6], ["l", -2, 21.5, 32, -1.5, "#ce1021", 3.4], _st(5, 4.5, 2.7, "#f7d618")],
   UZB: [["r", 0, 0, 30, 6.6, "#0099b5"], ["r", 0, 6.6, 30, 6.8, "#fff"], ["r", 0, 13.4, 30, 6.6, "#1eb53a"], ["r", 0, 6.6, 30, 0.8, "#ce1126"], ["r", 0, 12.6, 30, 0.8, "#ce1126"],
-    ["c", 4.6, 3.3, 2.1, "#fff"], ["c", 5.5, 3.3, 1.8, "#0099b5"], ["c", 9, 2.2, 0.5, "#fff"], ["c", 11, 3.3, 0.5, "#fff"], ["c", 13, 2.2, 0.5, "#fff"]],
+  ["c", 4.6, 3.3, 2.1, "#fff"], ["c", 5.5, 3.3, 1.8, "#0099b5"], ["c", 9, 2.2, 0.5, "#fff"], ["c", 11, 3.3, 0.5, "#fff"], ["c", 13, 2.2, 0.5, "#fff"]],
   COL: [["r", 0, 0, 30, 10, "#fcd116"], ["r", 0, 10, 30, 5, "#003893"], ["r", 0, 15, 30, 5, "#ce1126"]],
   ENG: [["r", 0, 0, 30, 20, "#fff"], ["r", 12.7, 0, 4.6, 20, "#ce1124"], ["r", 0, 7.7, 30, 4.6, "#ce1124"]],
   CRO: [..._h("#ff0000", "#fff", "#171796"), ["r", 11.4, 6.4, 7.2, 7.2, "#fff"],
-    ["r", 11.4, 6.4, 1.8, 1.8, "#ff0000"], ["r", 15, 6.4, 1.8, 1.8, "#ff0000"],
-    ["r", 13.2, 8.2, 1.8, 1.8, "#ff0000"], ["r", 16.8, 8.2, 1.8, 1.8, "#ff0000"],
-    ["r", 11.4, 10, 1.8, 1.8, "#ff0000"], ["r", 15, 10, 1.8, 1.8, "#ff0000"],
-    ["r", 13.2, 11.8, 1.8, 1.8, "#ff0000"], ["r", 16.8, 11.8, 1.8, 1.8, "#ff0000"]],
+  ["r", 11.4, 6.4, 1.8, 1.8, "#ff0000"], ["r", 15, 6.4, 1.8, 1.8, "#ff0000"],
+  ["r", 13.2, 8.2, 1.8, 1.8, "#ff0000"], ["r", 16.8, 8.2, 1.8, 1.8, "#ff0000"],
+  ["r", 11.4, 10, 1.8, 1.8, "#ff0000"], ["r", 15, 10, 1.8, 1.8, "#ff0000"],
+  ["r", 13.2, 11.8, 1.8, 1.8, "#ff0000"], ["r", 16.8, 11.8, 1.8, 1.8, "#ff0000"]],
   GHA: [..._h("#ce1126", "#fcd116", "#006b3f"), _st(15, 10, 3, "#000")],
   PAN: [["r", 0, 0, 15, 10, "#fff"], ["r", 15, 0, 15, 10, "#d21034"], ["r", 0, 10, 15, 10, "#005293"], ["r", 15, 10, 15, 10, "#fff"], _st(7.5, 5, 2.5, "#005293"), _st(22.5, 15, 2.5, "#d21034")],
 };
@@ -291,28 +293,28 @@ const normConfig = (c) =>
   !c
     ? null
     : {
-        name: c.name || "ליגת החברים",
-        players: c.players || [],
-        assign: c.assign || {},
-        draft: c.draft
-          ? {
-              order: c.draft.order || [],
-              perPlayer: c.draft.perPlayer || 0,
-              picks: c.draft.picks || [],
-              active: !!c.draft.active,
-            }
-          : null,
-        locks: {
-          bracket: !!(c.locks?.bracket),
-          groups: !!(c.locks?.groups),
-          ko: c.locks?.ko || {},
-        },
-        ai: {
-          enabled: !!(c.ai?.enabled),
-          workerUrl: resolveAiWorkerUrl(c.ai?.workerUrl),
-        },
-        created: c.created || 0,
-      };
+      name: c.name || "ליגת החברים",
+      players: c.players || [],
+      assign: c.assign || {},
+      draft: c.draft
+        ? {
+          order: c.draft.order || [],
+          perPlayer: c.draft.perPlayer || 0,
+          picks: c.draft.picks || [],
+          active: !!c.draft.active,
+        }
+        : null,
+      locks: {
+        bracket: !!(c.locks?.bracket),
+        groups: !!(c.locks?.groups),
+        ko: c.locks?.ko || {},
+      },
+      ai: {
+        enabled: !!(c.ai?.enabled),
+        workerUrl: resolveAiWorkerUrl(c.ai?.workerUrl),
+      },
+      created: c.created || 0,
+    };
 const normResults = (r) => ({ g: (r && r.g) || {}, ko: (r && r.ko) || {} });
 const normBets = (b) => ({
   g: (b && b.g) || {},
@@ -406,10 +408,10 @@ const Flag = ({ code, lg }) => {
     >
       {fl.map((s, i) =>
         s[0] === "r" ? <rect key={i} x={s[1]} y={s[2]} width={s[3]} height={s[4]} fill={s[5]} /> :
-        s[0] === "c" ? <circle key={i} cx={s[1]} cy={s[2]} r={s[3]} fill={s[4]} /> :
-        s[0] === "p" ? <polygon key={i} points={s[1]} fill={s[2]} /> :
-        s[0] === "l" ? <line key={i} x1={s[1]} y1={s[2]} x2={s[3]} y2={s[4]} stroke={s[5]} strokeWidth={s[6]} /> :
-        s[0] === "d" ? <path key={i} d={s[1]} fill={s[2]} /> : null
+          s[0] === "c" ? <circle key={i} cx={s[1]} cy={s[2]} r={s[3]} fill={s[4]} /> :
+            s[0] === "p" ? <polygon key={i} points={s[1]} fill={s[2]} /> :
+              s[0] === "l" ? <line key={i} x1={s[1]} y1={s[2]} x2={s[3]} y2={s[4]} stroke={s[5]} strokeWidth={s[6]} /> :
+                s[0] === "d" ? <path key={i} d={s[1]} fill={s[2]} /> : null
       )}
     </svg>
   );
@@ -450,23 +452,31 @@ function LiveMatchPills({ matches, className = "" }) {
   );
 }
 
-function TeamChip({ code, on, off, onClick, disabled, mark }) {
+function TeamChip({ code, on, off, onClick, disabled, mark, eliminated = false }) {
+  const stateClass = eliminated
+    ? on
+      ? "border-rose-500 bg-rose-500 bg-opacity-15 text-rose-100"
+      : "border-rose-800 bg-rose-950 bg-opacity-40 text-rose-300 hover:border-rose-600"
+    : on
+      ? "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-200"
+      : off
+        ? "border-slate-800 text-slate-600"
+        : "border-slate-700 text-slate-300 hover:border-slate-500";
+
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      title={eliminated ? "הודחה - לא יכולה לצבור עוד נקודות" : undefined}
       className={
         "flex items-center gap-1 rounded-full border px-2 py-1 text-xs transition-colors " +
-        (on
-          ? "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-200"
-          : off
-            ? "border-slate-800 text-slate-600"
-            : "border-slate-700 text-slate-300 hover:border-slate-500") +
+        stateClass +
         (disabled ? " cursor-default" : "")
       }
     >
       <Flag code={code} />
       <TName code={code} />
+      {eliminated && <ShieldX size={12} className="text-rose-300" />}
       {mark === "hit" && <Check size={12} className="text-emerald-400" />}
       {mark === "miss" && <X size={12} className="text-rose-400" />}
     </button>
@@ -647,7 +657,7 @@ function IdentityScreen({ players, onPick }) {
 
 /* ================= LEADERBOARD ================= */
 
-function Leaderboard({ config, scores, meId }) {
+function Leaderboard({ config, scores, meId, eliminatedTeams }) {
   const [openId, setOpenId] = useState(null);
   const locked = config?.locks?.bracket;
   return (
@@ -685,8 +695,18 @@ function Leaderboard({ config, scores, meId }) {
                 <div className="flex flex-wrap gap-1.5">
                   {r.myTeams.length === 0 && <span className="text-xs text-slate-600">עוד לא שובצו נבחרות</span>}
                   {r.myTeams.map((t) => (
-                    <span key={t} className="flex items-center gap-1 rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-300">
+                    <span
+                      key={t}
+                      title={eliminatedTeams?.has(t) ? "הודחה - לא יכולה לצבור עוד נקודות" : undefined}
+                      className={
+                        "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs " +
+                        (eliminatedTeams?.has(t)
+                          ? "border-rose-800 bg-rose-950 bg-opacity-40 text-rose-300"
+                          : "border-slate-700 text-slate-300")
+                      }
+                    >
                       <Flag code={t} /><TName code={t} />
+                      {eliminatedTeams?.has(t) && <ShieldX size={12} className="text-rose-300" />}
                     </span>
                   ))}
                 </div>
@@ -702,6 +722,109 @@ function Leaderboard({ config, scores, meId }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function TeamStatusBadge({ row }) {
+  if (row.eliminated) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-rose-800 bg-rose-950 bg-opacity-50 px-2 py-0.5 text-[11px] font-bold text-rose-300">
+        <ShieldX size={11} /> הודחה
+      </span>
+    );
+  }
+  if (!row.canScoreMore) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-700 bg-amber-950 bg-opacity-40 px-2 py-0.5 text-[11px] font-bold text-amber-300">
+        <Check size={11} /> ניקוד סופי
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-800 bg-emerald-950 bg-opacity-40 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+      <Check size={11} /> פעילה
+    </span>
+  );
+}
+
+function TeamsTab({ config, rows }) {
+  const playerIndex = (id) => config.players.findIndex((player) => player.id === id);
+  const activeCount = rows.filter((row) => row.canScoreMore).length;
+  const eliminatedCount = rows.filter((row) => row.eliminated).length;
+  const assignedCount = rows.filter((row) => row.ownerId).length;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
+          <div className="text-[11px] text-slate-500">פעילות</div>
+          <div className="font-mono text-lg font-black text-emerald-300">{activeCount}</div>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
+          <div className="text-[11px] text-slate-500">הודחו</div>
+          <div className="font-mono text-lg font-black text-rose-300">{eliminatedCount}</div>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
+          <div className="text-[11px] text-slate-500">שויכו</div>
+          <div className="font-mono text-lg font-black text-sky-300">{assignedCount}/48</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 px-3 text-[11px] font-bold text-slate-500">
+        <div className="col-span-1">#</div>
+        <div className="col-span-5">נבחרת</div>
+        <div className="col-span-3">שייכת ל</div>
+        <div className="col-span-1 text-center">בית</div>
+        <div className="col-span-2 text-left">ניקוד</div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        {rows.map((row, rank) => {
+          const ownerIdx = row.ownerId ? playerIndex(row.ownerId) : -1;
+          return (
+            <div
+              key={row.team}
+              className={
+                "grid grid-cols-12 items-center gap-2 rounded-2xl border px-3 py-2.5 " +
+                (row.eliminated
+                  ? "border-rose-900 bg-rose-950 bg-opacity-25"
+                  : !row.canScoreMore
+                    ? "border-amber-900 bg-amber-950 bg-opacity-20"
+                    : "border-slate-800 bg-slate-900")
+              }
+            >
+              <div className={"col-span-1 font-mono text-xs " + (rank === 0 && row.points > 0 ? "text-amber-300" : "text-slate-500")}>
+                {rank + 1}
+              </div>
+              <div className="col-span-5 flex min-w-0 items-center gap-1.5">
+                <Flag code={row.team} />
+                <span className={"truncate text-sm font-bold " + (row.eliminated ? "text-rose-200" : "text-slate-100")}>
+                  <TName code={row.team} />
+                </span>
+                {row.eliminated && <ShieldX size={13} className="shrink-0 text-rose-300" />}
+                <span className="hidden shrink-0 sm:inline-flex">
+                  <TeamStatusBadge row={row} />
+                </span>
+              </div>
+              <div className="col-span-3 flex min-w-0 items-center gap-1.5 text-xs text-slate-300">
+                {row.ownerId && ownerIdx >= 0 ? (
+                  <>
+                    <PlayerDot player={config.players[ownerIdx]} idx={ownerIdx} />
+                    <span className="truncate">{row.ownerName}</span>
+                  </>
+                ) : (
+                  <span className="truncate text-slate-600">לא שויכה</span>
+                )}
+              </div>
+              <div className="col-span-1 text-center font-mono text-xs text-slate-500">{row.group}</div>
+              <div className={"col-span-2 text-left font-mono text-base font-black " + (row.eliminated ? "text-rose-200" : "text-slate-100")}>
+                {fmtPts(row.points)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -771,7 +894,7 @@ function BracketPeek({ pid }) {
 
 /* ================= MY BETS: BRACKET ================= */
 
-function BracketEditor({ draft, setDraft, locked, reach, hasAnyKoResults }) {
+function BracketEditor({ draft, setDraft, locked, reach, hasAnyKoResults, eliminatedTeams = new Set() }) {
   const toggle = (tierIdx, team) => {
     if (locked) return;
     setDraft((prev) => {
@@ -823,6 +946,7 @@ function BracketEditor({ draft, setDraft, locked, reach, hasAnyKoResults }) {
                         on={picks.includes(t)}
                         disabled={locked}
                         onClick={() => toggle(ti, t)}
+                        eliminated={eliminatedTeams.has(t)}
                         mark={hasAnyKoResults && picks.includes(t) ? (reach[tier.k].has(t) ? "hit" : undefined) : undefined}
                       />
                     ))}
@@ -838,6 +962,7 @@ function BracketEditor({ draft, setDraft, locked, reach, hasAnyKoResults }) {
                     on={picks.includes(t)}
                     disabled={locked}
                     onClick={() => toggle(ti, t)}
+                    eliminated={eliminatedTeams.has(t)}
                     mark={picks.includes(t) && reach[tier.k].has(t) ? "hit" : undefined}
                   />
                 ))}
@@ -979,83 +1104,83 @@ function KoBets({ draft, setDraft, results, othersForKo, koLocks }) {
       {KO_ROUNDS.filter((r) => koByRound[r.k]).map((r) => {
         const roundLocked = !!(koLocks && koLocks[r.k]);
         return (
-        <Section key={r.k} title={r.n} defaultOpen badge={koByRound[r.k].length + " משחקים"} sub={roundLocked ? "נעול 🔒" : undefined}>
-          <div className="flex flex-col gap-2">
-            {koByRound[r.k].map((m) => {
-              const b = (draft.ko || {})[m.id] || {};
-              const done = !!m.w || roundLocked;
-              const setB = (patch) =>
-                setDraft((prev) => {
-                  const nko = { ...(prev.ko || {}) };
-                  const cur = { ...(nko[m.id] || {}), ...patch };
-                  if (!cur.t && !cur.p) delete nko[m.id]; else nko[m.id] = cur;
-                  return { ...prev, ko: nko };
-                });
-              const TeamBtn = ({ t }) => (
-                <button
-                  disabled={done}
-                  onClick={() => setB({ t: b.t === t ? null : t })}
-                  className={
-                    "flex flex-1 items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-xs " +
-                    (done && m.w === t
-                      ? "border-emerald-500 bg-emerald-500 bg-opacity-20 text-emerald-300"
-                      : b.t === t
-                        ? "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-200"
-                        : "border-slate-700 text-slate-300" + (done ? "" : " hover:border-slate-500"))
-                  }
-                >
-                  <Flag code={t} /><TName code={t} />
-                </button>
-              );
-              const PerBtn = ({ v, label }) => (
-                <button
-                  disabled={done}
-                  onClick={() => setB({ p: b.p === v ? null : v })}
-                  className={
-                    "flex-1 rounded-lg border px-2 py-1 text-xs " +
-                    (done && m.p === v && m.w
-                      ? "border-emerald-600 text-emerald-300"
-                      : b.p === v
-                        ? "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-200"
-                        : "border-slate-700 text-slate-400" + (done ? "" : " hover:border-slate-500"))
-                  }
-                >
-                  {label}
-                </button>
-              );
-              let earned = null;
-              if (done && b.t) earned = b.t === m.w ? (m.p && b.p === m.p ? 2 : 1) : 0;
-              return (
-                <div key={m.id} className="rounded-xl border border-slate-800 bg-slate-950 p-2">
-                  <div className="flex items-center gap-1.5">
-                    <TeamBtn t={m.t1} />
-                    <span className="text-xs text-slate-600">⚔️</span>
-                    <TeamBtn t={m.t2} />
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="text-xs text-slate-500">עולה:</span>
-                    <PerBtn v="90" label="ב־90 דק׳" />
-                    <PerBtn v="et" label="הארכה/פנדלים" />
-                    {earned != null && (
-                      <span className={"shrink-0 font-mono text-sm font-bold " + (earned > 0 ? "text-emerald-400" : "text-rose-400")}>
-                        +{earned}
-                      </span>
+          <Section key={r.k} title={r.n} defaultOpen badge={koByRound[r.k].length + " משחקים"} sub={roundLocked ? "נעול 🔒" : undefined}>
+            <div className="flex flex-col gap-2">
+              {koByRound[r.k].map((m) => {
+                const b = (draft.ko || {})[m.id] || {};
+                const done = !!m.w || roundLocked;
+                const setB = (patch) =>
+                  setDraft((prev) => {
+                    const nko = { ...(prev.ko || {}) };
+                    const cur = { ...(nko[m.id] || {}), ...patch };
+                    if (!cur.t && !cur.p) delete nko[m.id]; else nko[m.id] = cur;
+                    return { ...prev, ko: nko };
+                  });
+                const TeamBtn = ({ t }) => (
+                  <button
+                    disabled={done}
+                    onClick={() => setB({ t: b.t === t ? null : t })}
+                    className={
+                      "flex flex-1 items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-xs " +
+                      (done && m.w === t
+                        ? "border-emerald-500 bg-emerald-500 bg-opacity-20 text-emerald-300"
+                        : b.t === t
+                          ? "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-200"
+                          : "border-slate-700 text-slate-300" + (done ? "" : " hover:border-slate-500"))
+                    }
+                  >
+                    <Flag code={t} /><TName code={t} />
+                  </button>
+                );
+                const PerBtn = ({ v, label }) => (
+                  <button
+                    disabled={done}
+                    onClick={() => setB({ p: b.p === v ? null : v })}
+                    className={
+                      "flex-1 rounded-lg border px-2 py-1 text-xs " +
+                      (done && m.p === v && m.w
+                        ? "border-emerald-600 text-emerald-300"
+                        : b.p === v
+                          ? "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-200"
+                          : "border-slate-700 text-slate-400" + (done ? "" : " hover:border-slate-500"))
+                    }
+                  >
+                    {label}
+                  </button>
+                );
+                let earned = null;
+                if (done && b.t) earned = b.t === m.w ? (m.p && b.p === m.p ? 2 : 1) : 0;
+                return (
+                  <div key={m.id} className="rounded-xl border border-slate-800 bg-slate-950 p-2">
+                    <div className="flex items-center gap-1.5">
+                      <TeamBtn t={m.t1} />
+                      <span className="text-xs text-slate-600">⚔️</span>
+                      <TeamBtn t={m.t2} />
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <span className="text-xs text-slate-500">עולה:</span>
+                      <PerBtn v="90" label="ב־90 דק׳" />
+                      <PerBtn v="et" label="הארכה/פנדלים" />
+                      {earned != null && (
+                        <span className={"shrink-0 font-mono text-sm font-bold " + (earned > 0 ? "text-emerald-400" : "text-rose-400")}>
+                          +{earned}
+                        </span>
+                      )}
+                    </div>
+                    {done && othersForKo(m).length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-x-2 text-xs">
+                        {othersForKo(m).map((o) => (
+                          <span key={o.name} className={o.pts > 0 ? "text-emerald-400" : "text-slate-600"}>
+                            {o.name} +{o.pts}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {done && othersForKo(m).length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-x-2 text-xs">
-                      {othersForKo(m).map((o) => (
-                        <span key={o.name} className={o.pts > 0 ? "text-emerald-400" : "text-slate-600"}>
-                          {o.name} +{o.pts}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Section>
+                );
+              })}
+            </div>
+          </Section>
         );
       })}
     </div>
@@ -1064,7 +1189,7 @@ function KoBets({ draft, setDraft, results, othersForKo, koLocks }) {
 
 /* ================= MY BETS (wrapper) ================= */
 
-function MyBets({ me, config, results, betsAll, reach, onSaveBets }) {
+function MyBets({ me, config, results, betsAll, reach, eliminatedTeams, onSaveBets }) {
   const saved = betsAll[me] || EMPTY_BETS;
   const [draftState, setDraftState] = useState(() => ({ playerId: me, saved, draft: saved }));
   const [saving, setSaving] = useState(false);
@@ -1104,7 +1229,14 @@ function MyBets({ me, config, results, betsAll, reach, onSaveBets }) {
   return (
     <div className="flex flex-col gap-3">
       <Section title="ניחושי עולות" sub={locked ? "נעול 🔒" : "לנעול לפני פתיחת הטורניר!"} defaultOpen={!locked}>
-        <BracketEditor draft={draft} setDraft={setDraft} locked={locked} reach={reach} hasAnyKoResults={hasAnyKoResults} />
+        <BracketEditor
+          draft={draft}
+          setDraft={setDraft}
+          locked={locked}
+          reach={reach}
+          hasAnyKoResults={hasAnyKoResults}
+          eliminatedTeams={eliminatedTeams}
+        />
       </Section>
       <Section title="הימורי שלב הבתים" sub={groupsLocked ? "נעול 🔒" : "נק׳ אחת לכל פגיעה"}>
         <GroupBets draft={draft} setDraft={setDraft} results={results} othersFor={othersFor} locked={groupsLocked} />
@@ -1275,12 +1407,12 @@ function DraftTab({ config, meId, onSaveConfig, onTxConfig }) {
                 <span className="flex-1 text-sm text-slate-200">{pName(id)}</span>
                 <button
                   disabled={i === 0}
-                  onClick={() => setOrder((o) => { const n = [...o]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}
+                  onClick={() => setOrder((o) => { const n = [...o];[n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}
                   className="text-slate-500 disabled:opacity-20"
                 >▲</button>
                 <button
                   disabled={i === order.length - 1}
-                  onClick={() => setOrder((o) => { const n = [...o]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; })}
+                  onClick={() => setOrder((o) => { const n = [...o];[n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; })}
                   className="text-slate-500 disabled:opacity-20"
                 >▼</button>
               </div>
@@ -1356,7 +1488,7 @@ function DraftTab({ config, meId, onSaveConfig, onTxConfig }) {
         </div>
       )}
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-        <TeamGrid onTeam={draft && draft.active ? pickTeam : () => {}} highlightFree={!!(draft && draft.active)} />
+        <TeamGrid onTeam={draft && draft.active ? pickTeam : () => { }} highlightFree={!!(draft && draft.active)} />
       </div>
       {taken.length > 0 && (
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
@@ -1856,23 +1988,6 @@ const NEXT_ROUNDS = [
   { k: "sf", slots: [{ m: 101, a: 97, b: 98 }, { m: 102, a: 99, b: 100 }] },
 ];
 
-/* qualified thirds → third slots, respecting each slot's allowed groups (augmenting-path matching) */
-function assignThirds(qualified, slots) {
-  const taken = Array(slots.length).fill(null);
-  const tryAssign = (grp, visited) => {
-    for (let s = 0; s < slots.length; s++) {
-      if (visited.has(s) || !slots[s].allowed.includes(grp)) continue;
-      visited.add(s);
-      if (taken[s] == null || tryAssign(taken[s], visited)) { taken[s] = grp; return true; }
-    }
-    return false;
-  };
-  qualified.forEach((grp) => tryAssign(grp, new Set()));
-  const map = {};
-  taken.forEach((grp, s) => { if (grp) map[slots[s].m] = grp; });
-  return map;
-}
-
 const sameM = (x, y) =>
   x.round === y.round && x.t1 === y.t1 && x.t2 === y.t2 &&
   (x.w || null) === (y.w || null) && (x.p || null) === (y.p || null);
@@ -1891,8 +2006,7 @@ function deriveBracket(sim) {
     return { ko: koEqual(baseKo, sim.ko) ? sim.ko : baseKo, refs: {} };
   }
 
-  const thirdSlots = R32_SLOTS.filter((s) => s.b[0] === "3").map((s) => ({ m: s.m, allowed: s.b.slice(1).split("") }));
-  const thirdMap = assignThirds(qual.thirdsRanked.slice(0, 8).map((x) => x.g), thirdSlots);
+  const thirdMap = assignOfficialThirds(qual.thirdsRanked.slice(0, 8).map((x) => x.g));
   const teamOf = (tok, m) =>
     tok[0] === "1" ? qual.st[tok[1]].order[0]
       : tok[0] === "2" ? qual.st[tok[1]].order[1]
@@ -2351,21 +2465,21 @@ function AiChat({ config, results, betsAll, me, liveMeta }) {
     const koEntries = Object.entries(results.ko || {});
     const koText = koEntries.length
       ? koEntries.map(([, m]) => {
-          const round = KO_ROUNDS.find((r) => r.k === m.round)?.n || m.round;
-          const winner = m.w ? ` → ${T[m.w]?.[0] || m.w}${m.p === "et" ? " (הארכה)" : ""}` : " (טרם שוחק)";
-          return `${round}: ${T[m.t1]?.[0] || m.t1} vs ${T[m.t2]?.[0] || m.t2}${winner}`;
-        }).join("\n")
+        const round = KO_ROUNDS.find((r) => r.k === m.round)?.n || m.round;
+        const winner = m.w ? ` → ${T[m.w]?.[0] || m.w}${m.p === "et" ? " (הארכה)" : ""}` : " (טרם שוחק)";
+        return `${round}: ${T[m.t1]?.[0] || m.t1} vs ${T[m.t2]?.[0] || m.t2}${winner}`;
+      }).join("\n")
       : "אין עדיין";
 
     // --- live matches ---
     const liveMatches = ALL_GROUP_FIXTURES.filter((f) => liveMeta?.[f.id]?.status === "live");
     const liveText = liveMatches.length
       ? liveMatches.map((f) => {
-          const meta = liveMeta[f.id];
-          const score = results.g?.[f.id] ? ` (${results.g[f.id]})` : "";
-          const clock = meta.displayClock ? ` [${meta.displayClock}]` : "";
-          return `${T[f.t1]?.[0] || f.t1} vs ${T[f.t2]?.[0] || f.t2}${score}${clock}`;
-        }).join("; ")
+        const meta = liveMeta[f.id];
+        const score = results.g?.[f.id] ? ` (${results.g[f.id]})` : "";
+        const clock = meta.displayClock ? ` [${meta.displayClock}]` : "";
+        return `${T[f.t1]?.[0] || f.t1} vs ${T[f.t2]?.[0] || f.t2}${score}${clock}`;
+      }).join("; ")
       : null;
 
     // --- upcoming matches with kickoff times ---
@@ -2636,6 +2750,7 @@ function AiChat({ config, results, betsAll, me, liveMeta }) {
 
 const TABS = [
   { k: "table", n: "טבלה", icon: Trophy },
+  { k: "teams", n: "נבחרות", icon: ListOrdered },
   { k: "bets", n: "ההימורים שלי", icon: Target },
   { k: "draft", n: "דראפט", icon: Shuffle },
   { k: "sim", n: "סימולציה", icon: FlaskConical },
@@ -2759,6 +2874,11 @@ export default function App() {
   };
 
   const scores = useMemo(() => (config ? computeScores(config, results, betsAll) : null), [config, results, betsAll]);
+  const teamRows = useMemo(() => (config ? buildTeamTournamentRows(config, results) : []), [config, results]);
+  const eliminatedTeams = useMemo(
+    () => new Set(teamRows.filter((row) => row.eliminated).map((row) => row.team)),
+    [teamRows],
+  );
   const liveMatches = useMemo(
     () => selectLiveMatches({ results, liveMeta }),
     [results, liveMeta],
@@ -2867,12 +2987,23 @@ export default function App() {
 
             <BracketPeekCtx.Provider value={betsAll}>
               <div className={tab === "table" ? "" : "hidden"}>
-                {scores && <Leaderboard config={config} scores={scores} meId={me} />}
+                {scores && <Leaderboard config={config} scores={scores} meId={me} eliminatedTeams={eliminatedTeams} />}
               </div>
             </BracketPeekCtx.Provider>
+            <div className={tab === "teams" ? "" : "hidden"}>
+              <TeamsTab config={config} rows={teamRows} />
+            </div>
             <div className={tab === "bets" ? "" : "hidden"}>
               {scores && (
-                <MyBets me={me} config={config} results={results} betsAll={betsAll} reach={scores.reach} onSaveBets={saveMyBets} />
+                <MyBets
+                  me={me}
+                  config={config}
+                  results={results}
+                  betsAll={betsAll}
+                  reach={scores.reach}
+                  eliminatedTeams={eliminatedTeams}
+                  onSaveBets={saveMyBets}
+                />
               )}
             </div>
             <div className={tab === "draft" ? "" : "hidden"}>
