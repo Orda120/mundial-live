@@ -1457,6 +1457,19 @@ function GroupMatchComparison({ match, players }) {
   const leftName = teamName(match.t1, T[match.t1]?.[0] || match.t1);
   const rightName = teamName(match.t2, T[match.t2]?.[0] || match.t2);
   const sc = scoreOf(match.result);
+  const outcome = outcomeOf(match.result);
+  const outcomeLabel = outcome === "1"
+    ? t("comparePickWin", { team: leftName })
+    : outcome === "2"
+      ? t("comparePickWin", { team: rightName })
+      : outcome === "X"
+        ? t("comparePickDraw")
+        : null;
+  const scoreLabel = sc ? `${sc[0]}:${sc[1]}` : match.result;
+  const resultLabel = match.result
+    ? t("compareResult", { result: outcomeLabel ? `${scoreLabel} · ${outcomeLabel}` : scoreLabel })
+    : t("compareUpcoming");
+  const pickTone = (pick) => (outcome === pick ? "emerald" : pick === "X" ? "amber" : "sky");
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3">
@@ -1469,13 +1482,13 @@ function GroupMatchComparison({ match, players }) {
           <span className="truncate">{rightName}</span>
         </div>
         <Pill tone={match.result ? "emerald" : "slate"}>
-          {sc ? `${sc[0]}:${sc[1]}` : match.result || t("compareUpcoming")}
+          {resultLabel}
         </Pill>
       </div>
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-        <MatchBucketRow label={t("comparePickWin", { team: leftName })} ids={match.buckets["1"]} players={players} tone="sky" />
-        <MatchBucketRow label={t("comparePickDraw")} ids={match.buckets.X} players={players} tone="amber" />
-        <MatchBucketRow label={t("comparePickWin", { team: rightName })} ids={match.buckets["2"]} players={players} tone="sky" />
+        <MatchBucketRow label={t("comparePickWin", { team: leftName })} ids={match.buckets["1"]} players={players} tone={pickTone("1")} />
+        <MatchBucketRow label={t("comparePickDraw")} ids={match.buckets.X} players={players} tone={pickTone("X")} />
+        <MatchBucketRow label={t("comparePickWin", { team: rightName })} ids={match.buckets["2"]} players={players} tone={pickTone("2")} />
         <MatchBucketRow label={t("compareNoPick")} ids={match.buckets.none} players={players} />
       </div>
     </div>
@@ -1487,6 +1500,19 @@ function KoMatchComparison({ match, players }) {
   const teams = [match.t1, match.t2, ...Object.keys(match.winnerBuckets || {})]
     .filter(Boolean)
     .filter((team, index, arr) => arr.indexOf(team) === index);
+  const winnerName = match.winner ? teamName(match.winner, T[match.winner]?.[0] || match.winner) : null;
+  const methodLabel = match.method === "90"
+    ? t("compareMethod90")
+    : match.method === "et"
+      ? t("compareMethodEt")
+      : null;
+  const resultLabel = match.winner
+    ? t("compareResult", {
+      result: methodLabel
+        ? `${t("compareWinner", { team: winnerName })} · ${methodLabel}`
+        : t("compareWinner", { team: winnerName }),
+    })
+    : t("compareUpcoming");
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3">
@@ -1499,9 +1525,7 @@ function KoMatchComparison({ match, players }) {
           <span className="truncate">{teamName(match.t2, T[match.t2]?.[0] || match.t2)}</span>
         </div>
         <Pill tone={match.winner ? "emerald" : "slate"}>
-          {match.winner
-            ? t("compareWinner", { team: teamName(match.winner, T[match.winner]?.[0] || match.winner) })
-            : t("compareUpcoming")}
+          {resultLabel}
         </Pill>
       </div>
 
