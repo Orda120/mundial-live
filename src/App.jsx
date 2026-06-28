@@ -27,6 +27,7 @@ import {
 } from "./worldCupData";
 import { buildTeamTournamentRows } from "./teamStandings";
 import {
+  buildBettableKnockoutSchedule,
   buildKnockoutSchedule,
   buildScheduledBracketKo,
   FEED,
@@ -333,7 +334,7 @@ function computeScores(config, results, betsAll) {
   const players = config?.players || [];
   const assign = config?.assign || {};
   const gRes = results?.g || {};
-  const koArr = Object.entries(results?.ko || {}).map(([id, m]) => ({ id, ...m }));
+  const koArr = buildKnockoutSchedule(results);
 
   // teams that actually reached each stage: playing in a round means you reached it,
   // winning a round means you reached the next one
@@ -490,6 +491,9 @@ function TeamChip({ code, on, off, onClick, disabled, mark, eliminated = false }
 
 function Section({ title, sub, children, defaultOpen = false, badge }) {
   const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900">
       <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-4 py-3 text-right">
@@ -898,7 +902,7 @@ function BracketPeek({ pid }) {
 
 /* ================= MY BETS: BRACKET ================= */
 
-function BracketEditor({ draft, setDraft, locked, reach, hasAnyKoResults, eliminatedTeams = new Set() }) {
+function BracketEditor({ draft, setDraft, locked, reach, hasAnyBracketReach, eliminatedTeams = new Set() }) {
   const toggle = (tierIdx, team) => {
     if (locked) return;
     setDraft((prev) => {
@@ -951,7 +955,7 @@ function BracketEditor({ draft, setDraft, locked, reach, hasAnyKoResults, elimin
                         disabled={locked}
                         onClick={() => toggle(ti, t)}
                         eliminated={eliminatedTeams.has(t)}
-                        mark={hasAnyKoResults && picks.includes(t) ? (reach[tier.k].has(t) ? "hit" : undefined) : undefined}
+                        mark={hasAnyBracketReach && picks.includes(t) ? (reach[tier.k].has(t) ? "hit" : undefined) : undefined}
                       />
                     ))}
                   </div>
@@ -1087,14 +1091,16 @@ function GroupBets({ draft, setDraft, results, othersFor, locked }) {
 function KoBets({ draft, setDraft, results, othersForKo, koLocks }) {
   const koByRound = useMemo(() => {
     const map = {};
-    Object.entries(results.ko || {}).forEach(([id, m]) => {
-      (map[m.round] = map[m.round] || []).push({ id, ...m });
+    buildBettableKnockoutSchedule(results).forEach((match) => {
+      (map[match.round] = map[match.round] || []).push(match);
     });
-    Object.values(map).forEach((arr) => arr.sort((a, b) => a.id.localeCompare(b.id)));
+    Object.values(map).forEach((arr) =>
+      arr.sort((a, b) => (a.matchNo || 999) - (b.matchNo || 999) || a.id.localeCompare(b.id))
+    );
     return map;
   }, [results]);
 
-  const anyMatches = Object.keys(results.ko || {}).length > 0;
+  const anyMatches = Object.values(koByRound).some((matches) => matches.length > 0);
 
   if (!anyMatches)
     return (
@@ -1213,7 +1219,8 @@ function MyBets({ me, config, results, betsAll, reach, eliminatedTeams, onSaveBe
   const groupsLocked = !!config?.locks?.groups;
   const koLocks = config?.locks?.ko || {};
   const players = config.players;
-  const hasAnyKoResults = Object.values(results.ko || {}).some((m) => m.w);
+  const bettableKoCount = useMemo(() => buildBettableKnockoutSchedule(results).length, [results]);
+  const hasAnyBracketReach = Object.values(reach || {}).some((tier) => tier?.size > 0);
 
   const othersFor = (fid) => {
     const o = outcomeOf(results.g?.[fid]);
@@ -1238,14 +1245,14 @@ function MyBets({ me, config, results, betsAll, reach, eliminatedTeams, onSaveBe
           setDraft={setDraft}
           locked={locked}
           reach={reach}
-          hasAnyKoResults={hasAnyKoResults}
+          hasAnyBracketReach={hasAnyBracketReach}
           eliminatedTeams={eliminatedTeams}
         />
       </Section>
       <Section title="הימורי שלב הבתים" sub={groupsLocked ? "נעול 🔒" : "נק׳ אחת לכל פגיעה"}>
         <GroupBets draft={draft} setDraft={setDraft} results={results} othersFor={othersFor} locked={groupsLocked} />
       </Section>
-      <Section title="הימורי נוקאאוט" sub="עולה נכונה 1 + בונוס דרך 1" defaultOpen={Object.keys(results.ko || {}).length > 0}>
+      <Section title="הימורי נוקאאוט" sub="עולה נכונה 1 + בונוס דרך 1" defaultOpen={bettableKoCount > 0} badge={bettableKoCount || undefined}>
         <KoBets draft={draft} setDraft={setDraft} results={results} othersForKo={othersForKo} koLocks={koLocks} />
       </Section>
       <SaveBar

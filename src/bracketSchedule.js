@@ -267,6 +267,10 @@ export function buildKnockoutSchedule(results = {}) {
   return schedule;
 }
 
+export function buildBettableKnockoutSchedule(results = {}) {
+  return buildKnockoutSchedule(results).filter((match) => match.t1 && match.t2);
+}
+
 export function buildScheduledBracketKo(results = {}) {
   return Object.fromEntries(
     buildKnockoutSchedule(results).map((match) => [
