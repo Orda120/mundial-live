@@ -135,10 +135,11 @@ replaceOnce(
   "leaderboard breakdown details",
 );
 
-replaceOnce(
-  `// peeks at another player's champion pick (only rendered after bracket lock)
+if (!source.includes("function ScoreBreakdownDetails({ row })")) {
+  replaceOnce(
+    `// peeks at another player's champion pick (only rendered after bracket lock)
 const BracketPeekCtx = React.createContext({});`,
-  `function ScoreBreakdownDetails({ row }) {
+    `function ScoreBreakdownDetails({ row }) {
   const [mode, setMode] = useState("type");
   const typeRows = row.breakdown?.typeRows || [];
   const teamRows = row.breakdown?.teamRows || [];
@@ -190,8 +191,9 @@ const BracketPeekCtx = React.createContext({});`,
 
 // peeks at another player's champion pick (only rendered after bracket lock)
 const BracketPeekCtx = React.createContext({});`,
-  "ScoreBreakdownDetails component",
-);
+    "ScoreBreakdownDetails component",
+  );
+}
 
 if (changed) {
   writeFileSync(appPath, source.replaceAll("\n", newline));

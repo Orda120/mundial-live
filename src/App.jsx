@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Trophy, RefreshCw, Check, X, Plus, Trash2, ChevronDown, ChevronLeft,
   Lock, Unlock, Users, Target, Shuffle, Settings, BookOpen, Undo2, AlertTriangle, Pencil, FlaskConical, Link2,
-  Bot, Send, MessageSquare, ListOrdered, ShieldX,
+  Bot, Send, MessageSquare, ListOrdered, ShieldX, Languages,
 } from "lucide-react";
+import { LocaleProvider, useLocale } from "./i18n";
+import { Button, Card, EmptyState, Pill, StatCard } from "./ui";
 import { dbReady, sSet, sUpdate, sDel, sTx, subscribe, subscribeConnected } from "./db";
 import { resolveAiWorkerUrl } from "./aiConfig";
 import { syncBetsDraft } from "./betsDraft";
@@ -422,9 +424,13 @@ const Flag = ({ code, lg }) => {
     </svg>
   );
 };
-const TName = ({ code }) => <span>{T[code]?.[0] || code}</span>;
+const TName = ({ code }) => {
+  const { teamName } = useLocale();
+  return <span>{teamName(code, T[code]?.[0] || code)}</span>;
+};
 
 function LiveMatchPills({ matches, className = "" }) {
+  const { t } = useLocale();
   if (!matches.length) return null;
 
   return (
@@ -432,16 +438,16 @@ function LiveMatchPills({ matches, className = "" }) {
       className={"gap-1.5 " + className}
       role="status"
       aria-live="polite"
-      aria-label="משחקים חיים"
+      aria-label={t("liveMatches")}
     >
       {matches.map((match) => (
         <div
           key={match.id}
-          className="flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-800 bg-emerald-950 px-2.5 py-1 text-[10px] shadow-sm shadow-emerald-950"
+          className="flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-800 bg-emerald-950/85 px-2.5 py-1 text-[10px] shadow-sm shadow-emerald-950"
         >
           <span className="flex items-center gap-1 font-black text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-sm shadow-red-500" />
-            {match.displayClock ? `LIVE · ${match.displayClock}` : "LIVE"}
+            {match.displayClock ? `${t("statusLive")} · ${match.displayClock}` : t("statusLive")}
           </span>
           <span className="flex items-center gap-1 text-slate-200">
             <Flag code={match.t1} />
@@ -583,31 +589,30 @@ const SaveBar = ({ show, onSave, saving }) =>
 /* ================= SETUP & IDENTITY ================= */
 
 function SetupScreen({ onCreate }) {
+  const { t } = useLocale();
   const [names, setNames] = useState(["", "", "", ""]);
-  const [leagueName, setLeagueName] = useState("ליגת החברים");
+  const [leagueName, setLeagueName] = useState(() => t("defaultLeague"));
   const [busy, setBusy] = useState(false);
   const valid = names.map((n) => n.trim()).filter(Boolean);
 
   return (
     <div className="mx-auto max-w-md py-8">
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-        <h2 className="mb-1 text-lg font-black text-slate-100">פתיחת ליגה חדשה</h2>
-        <p className="mb-4 text-sm text-slate-400">
-          מוסיפים את כל החברים פעם אחת — וכל אחד שייכנס לאפליקציה יבחר מי הוא.
-        </p>
-        <label className="mb-1 block text-xs text-slate-500">שם הליגה</label>
+      <Card className="p-5">
+        <h2 className="mb-1 text-lg font-black text-slate-100">{t("setupTitle")}</h2>
+        <p className="mb-4 text-sm leading-6 text-slate-400">{t("setupCopy")}</p>
+        <label className="mb-1 block text-xs text-slate-500">{t("setupLeagueName")}</label>
         <input
           value={leagueName}
           onChange={(e) => setLeagueName(e.target.value)}
           className="mb-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
         />
-        <label className="mb-1 block text-xs text-slate-500">שחקנים</label>
+        <label className="mb-1 block text-xs text-slate-500">{t("setupPlayers")}</label>
         <div className="flex flex-col gap-2">
           {names.map((n, i) => (
             <div key={i} className="flex items-center gap-2">
               <input
                 value={n}
-                placeholder={"שחקן " + (i + 1)}
+                placeholder={t("setupPlayerPlaceholder", { n: i + 1 })}
                 onChange={(e) => setNames(names.map((x, j) => (j === i ? e.target.value : x)))}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
               />
@@ -623,32 +628,34 @@ function SetupScreen({ onCreate }) {
           onClick={() => setNames([...names, ""])}
           className="mt-2 flex items-center gap-1 text-sm text-sky-400 hover:text-sky-300"
         >
-          <Plus size={14} /> עוד שחקן
+          <Plus size={14} /> {t("setupAddPlayer")}
         </button>
-        <button
+        <Button
           disabled={valid.length < 2 || busy}
           onClick={async () => {
             setBusy(true);
-            await onCreate(leagueName.trim() || "ליגת החברים", valid);
+            await onCreate(leagueName.trim() || t("defaultLeague"), valid);
             setBusy(false);
           }}
-          className="mt-5 w-full rounded-xl bg-sky-500 py-2.5 font-bold text-slate-950 hover:bg-sky-400 disabled:opacity-40"
+          block
+          className="mt-5"
         >
-          {busy ? "יוצר…" : "צא לדרך ⚽"}
-        </button>
+          {busy ? t("setupBusy") : t("setupSubmit")}
+        </Button>
         <p className="mt-3 text-center text-xs text-slate-500">
-          יש לכם כבר ליגה? פתחו את הקישור ששותף בקבוצה — הוא מכיל את קוד הליגה.
+          {t("setupExisting")}
         </p>
-      </div>
+      </Card>
     </div>
   );
 }
 
 function IdentityScreen({ players, onPick }) {
+  const { t } = useLocale();
   return (
     <div className="mx-auto max-w-md py-10 text-center">
-      <h2 className="mb-1 text-lg font-black text-slate-100">מי אתה?</h2>
-      <p className="mb-5 text-sm text-slate-400">הבחירה נשמרת רק במכשיר שלך</p>
+      <h2 className="mb-1 text-lg font-black text-slate-100">{t("identityTitle")}</h2>
+      <p className="mb-5 text-sm text-slate-400">{t("identityCopy")}</p>
       <div className="flex flex-col gap-2">
         {players.map((p, i) => (
           <button
@@ -667,68 +674,77 @@ function IdentityScreen({ players, onPick }) {
 /* ================= LEADERBOARD ================= */
 
 function Leaderboard({ config, scores, meId, eliminatedTeams }) {
+  const { t } = useLocale();
   const [openId, setOpenId] = useState(null);
   const locked = config?.locks?.bracket;
+  const maxTotal = Math.max(1, ...scores.rows.map((row) => row.total || 0));
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-12 px-3 text-xs text-slate-500">
-        <div className="col-span-4">שחקן</div>
-        <div className="col-span-2 text-center">דראפט</div>
-        <div className="col-span-2 text-center">משחקים</div>
-        <div className="col-span-2 text-center">עולות</div>
-        <div className="col-span-2 text-center">סה״כ</div>
+      <div className="grid grid-cols-[minmax(0,1.7fr)_repeat(4,minmax(54px,.7fr))] gap-2 px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+        <div>{t("lbPlayer")}</div>
+        <div className="text-center">{t("lbDraft")}</div>
+        <div className="text-center">{t("lbMatches")}</div>
+        <div className="text-center">{t("lbBracket")}</div>
+        <div className="text-center">{t("lbTotal")}</div>
       </div>
       {scores.rows.map((r, rank) => {
         const pIdx = config.players.findIndex((x) => x.id === r.p.id);
         const isMe = r.p.id === meId;
         const open = openId === r.p.id;
+        const leader = rank === 0 && r.total > 0;
+        const pct = Math.max(4, Math.round(((r.total || 0) / maxTotal) * 100));
         return (
-          <div key={r.p.id} className={"rounded-2xl border bg-slate-900 " + (rank === 0 && r.total > 0 ? "border-amber-400" : "border-slate-800")}>
-            <button onClick={() => setOpenId(open ? null : r.p.id)} className="grid w-full grid-cols-12 items-center px-3 py-3 text-right">
-              <div className="col-span-4 flex items-center gap-2 overflow-hidden">
-                <span className={"w-4 font-mono text-xs " + (rank === 0 && r.total > 0 ? "text-amber-300" : "text-slate-500")}>{rank + 1}</span>
+          <Card key={r.p.id} leader={leader} interactive className="overflow-hidden">
+            <button onClick={() => setOpenId(open ? null : r.p.id)} className="grid w-full grid-cols-[minmax(0,1.7fr)_repeat(4,minmax(54px,.7fr))] items-center gap-2 px-3 py-3 text-start">
+              <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                <span className={"w-5 shrink-0 font-mono text-xs " + (leader ? "text-amber-300" : "text-slate-500")}>{rank + 1}</span>
                 <PlayerDot player={r.p} idx={pIdx} />
                 <span className="truncate text-sm font-bold text-slate-100">{r.p.name}</span>
-                {isMe && <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-bold text-sky-300">אני</span>}
+                {isMe && <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs font-bold text-sky-300">{t("lbMe")}</span>}
               </div>
-              <div className="col-span-2 text-center font-mono text-sm text-slate-300">{r.draft}</div>
-              <div className="col-span-2 text-center font-mono text-sm text-slate-300">{r.matches}</div>
-              <div className="col-span-2 text-center font-mono text-sm text-slate-300">{r.bracket}</div>
-              <div className={"col-span-2 text-center font-mono text-lg font-bold " + (rank === 0 && r.total > 0 ? "text-amber-300" : "text-slate-100")}>
-                {r.total}
+              <div className="text-center font-mono text-sm text-slate-300">{r.draft}</div>
+              <div className="text-center font-mono text-sm text-slate-300">{r.matches}</div>
+              <div className="text-center font-mono text-sm text-slate-300">{r.bracket}</div>
+              <div>
+                <div className={"text-center font-mono text-lg font-black " + (leader ? "text-amber-300" : "text-slate-100")}>
+                  {r.total}
+                </div>
+                <div className="score-meter mt-1" aria-hidden="true">
+                  <span style={{ width: `${pct}%` }} />
+                </div>
               </div>
             </button>
             {open && (
               <div className="border-t border-slate-800 px-3 py-3 text-sm">
-                <div className="mb-1 text-xs text-slate-500">הנבחרות בדראפט:</div>
+                <div className="mb-1 text-xs text-slate-500">{t("lbDraftTeams")}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {r.myTeams.length === 0 && <span className="text-xs text-slate-600">עוד לא שובצו נבחרות</span>}
-                  {r.myTeams.map((t) => (
+                  {r.myTeams.length === 0 && <span className="text-xs text-slate-600">{t("lbNoDraftTeams")}</span>}
+                  {r.myTeams.map((teamCode) => (
                     <span
-                      key={t}
-                      title={eliminatedTeams?.has(t) ? "הודחה - לא יכולה לצבור עוד נקודות" : undefined}
+                      key={teamCode}
+                      title={eliminatedTeams?.has(teamCode) ? t("statusEliminated") : undefined}
                       className={
                         "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs " +
-                        (eliminatedTeams?.has(t)
+                        (eliminatedTeams?.has(teamCode)
                           ? "border-rose-800 bg-rose-950 bg-opacity-40 text-rose-300"
                           : "border-slate-700 text-slate-300")
                       }
                     >
-                      <Flag code={t} /><TName code={t} />
-                      {eliminatedTeams?.has(t) && <ShieldX size={12} className="text-rose-300" />}
+                      <Flag code={teamCode} /><TName code={teamCode} />
+                      {eliminatedTeams?.has(teamCode) && <ShieldX size={12} className="text-rose-300" />}
                     </span>
                   ))}
                 </div>
                 {locked && (
                   <div className="mt-3 text-xs text-slate-400">
-                    <span className="text-slate-500">ניחוש אלופה: </span>
+                    <span className="text-slate-500">{t("lbChampionPick")} </span>
                     {r.p.id && (config && true) ? <BracketPeek pid={r.p.id} /> : null}
                   </div>
                 )}
                 <ScoreBreakdownDetails row={r} />
               </div>
             )}
-          </div>
+          </Card>
         );
       })}
     </div>
@@ -736,28 +752,30 @@ function Leaderboard({ config, scores, meId, eliminatedTeams }) {
 }
 
 function TeamStatusBadge({ row }) {
+  const { t } = useLocale();
   if (row.eliminated) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-rose-800 bg-rose-950 bg-opacity-50 px-2 py-0.5 text-[11px] font-bold text-rose-300">
-        <ShieldX size={11} /> הודחה
+        <ShieldX size={11} /> {t("statusEliminated")}
       </span>
     );
   }
   if (!row.canScoreMore) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-amber-700 bg-amber-950 bg-opacity-40 px-2 py-0.5 text-[11px] font-bold text-amber-300">
-        <Check size={11} /> ניקוד סופי
+        <Check size={11} /> {t("statusFinal")}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-emerald-800 bg-emerald-950 bg-opacity-40 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
-      <Check size={11} /> פעילה
+      <Check size={11} /> {t("statusActive")}
     </span>
   );
 }
 
 function TeamsTab({ config, rows }) {
+  const { t } = useLocale();
   const playerIndex = (id) => config.players.findIndex((player) => player.id === id);
   const activeCount = rows.filter((row) => row.canScoreMore).length;
   const eliminatedCount = rows.filter((row) => row.eliminated).length;
@@ -765,26 +783,17 @@ function TeamsTab({ config, rows }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
-          <div className="text-[11px] text-slate-500">עדיין במשחק</div>
-          <div className="font-mono text-lg font-black text-emerald-300">{activeCount}</div>
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
-          <div className="text-[11px] text-slate-500">הודחו</div>
-          <div className="font-mono text-lg font-black text-rose-300">{eliminatedCount}</div>
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
-          <div className="text-[11px] text-slate-500">סה"כ קבוצות</div>
-          <div className="font-mono text-lg font-black text-sky-300">{rows.length}</div>
-        </div>
+        <StatCard label={t("teamsActive")} value={activeCount} tone="emerald" className="p-3" />
+        <StatCard label={t("teamsEliminated")} value={eliminatedCount} tone="rose" className="p-3" />
+        <StatCard label={t("teamsTotal")} value={rows.length} tone="sky" className="p-3" />
       </div>
 
       <div className="grid grid-cols-12 px-3 text-[11px] font-bold text-slate-500">
         <div className="col-span-1">#</div>
-        <div className="col-span-5">נבחרת</div>
-        <div className="col-span-3">שייכת ל</div>
-        <div className="col-span-1 text-center">בית</div>
-        <div className="col-span-2 text-left">ניקוד</div>
+        <div className="col-span-5">{t("teamsTeam")}</div>
+        <div className="col-span-3">{t("teamsOwner")}</div>
+        <div className="col-span-1 text-center">{t("teamsGroup")}</div>
+        <div className="col-span-2 text-end">{t("teamsPoints")}</div>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -822,11 +831,11 @@ function TeamsTab({ config, rows }) {
                     <span className="truncate">{row.ownerName}</span>
                   </>
                 ) : (
-                  <span className="truncate text-slate-600">לא שויכה</span>
+                  <span className="truncate text-slate-600">{t("teamsUnassigned")}</span>
                 )}
               </div>
               <div className="col-span-1 text-center font-mono text-xs text-slate-500">{row.group}</div>
-              <div className={"col-span-2 text-left font-mono text-base font-black " + (row.eliminated ? "text-rose-200" : "text-slate-100")}>
+              <div className={"col-span-2 text-end font-mono text-base font-black " + (row.eliminated ? "text-rose-200" : "text-slate-100")}>
                 {fmtPts(row.points)}
               </div>
             </div>
@@ -838,6 +847,7 @@ function TeamsTab({ config, rows }) {
 }
 
 function ScoreBreakdownDetails({ row }) {
+  const { t } = useLocale();
   const [mode, setMode] = useState("type");
   const typeRows = row.breakdown?.typeRows || [];
   const teamRows = row.breakdown?.teamRows || [];
@@ -847,8 +857,8 @@ function ScoreBreakdownDetails({ row }) {
     <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div>
-          <div className="text-xs font-bold text-slate-300">פירוט נקודות</div>
-          <div className="text-[11px] text-slate-500">משחקים: {row.mGroup} נק׳ בתים · {row.mKo} נק׳ נוקאאוט</div>
+          <div className="text-xs font-bold text-slate-300">{t("scoreBreakdown")}</div>
+          <div className="text-[11px] text-slate-500">{t("scoreBreakdownMeta", { group: row.mGroup, ko: row.mKo })}</div>
         </div>
         <div className="flex rounded-full border border-slate-800 bg-slate-900 p-0.5 text-[11px]">
           <button
@@ -856,20 +866,20 @@ function ScoreBreakdownDetails({ row }) {
             onClick={() => setMode("type")}
             className={"rounded-full px-2 py-1 " + (mode === "type" ? "bg-sky-500 text-white" : "text-slate-400")}
           >
-            לפי דרך
+            {t("byType")}
           </button>
           <button
             type="button"
             onClick={() => setMode("team")}
             className={"rounded-full px-2 py-1 " + (mode === "team" ? "bg-sky-500 text-white" : "text-slate-400")}
           >
-            לפי נבחרת
+            {t("byTeam")}
           </button>
         </div>
       </div>
 
       {rows.length === 0 ? (
-        <div className="text-xs text-slate-600">עוד אין נקודות לפירוט</div>
+        <div className="text-xs text-slate-600">{t("noBreakdown")}</div>
       ) : (
         <div className="flex flex-col gap-1.5">
           {rows.map((item) => (
@@ -884,6 +894,14 @@ function ScoreBreakdownDetails({ row }) {
         </div>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LocaleProvider>
+      <AppContent />
+    </LocaleProvider>
   );
 }
 
@@ -1105,7 +1123,7 @@ function KoBets({ draft, setDraft, results, othersForKo, koLocks }) {
   if (!anyMatches)
     return (
       <div className="rounded-xl border border-dashed border-slate-700 p-4 text-center text-sm text-slate-500">
-        עדיין אין משחקי נוקאאוט. ברגע שההצלבות ייקבעו, מנהל הליגה יוסיף אותם במסך הניהול — וכאן תוכלו להמר מי עולה ואיך.
+        עדיין אין משחקי נוקאאוט מוכנים להימור. ברגע שהעולות או מנצחות הסיבוב ייקבעו, המשחקים יופיעו כאן אוטומטית.
       </div>
     );
 
@@ -1119,32 +1137,39 @@ function KoBets({ draft, setDraft, results, othersForKo, koLocks }) {
               {koByRound[r.k].map((m) => {
                 const b = (draft.ko || {})[m.id] || {};
                 const done = !!m.w || roundLocked;
+                const canBet = !!(m.t1 && m.t2);
                 const setB = (patch) =>
                   setDraft((prev) => {
+                    if (!canBet || done) return prev;
                     const nko = { ...(prev.ko || {}) };
                     const cur = { ...(nko[m.id] || {}), ...patch };
                     if (!cur.t && !cur.p) delete nko[m.id]; else nko[m.id] = cur;
                     return { ...prev, ko: nko };
                   });
-                const TeamBtn = ({ t }) => (
+                const TeamBtn = ({ competitor }) => {
+                  const t = competitor.team;
+                  return (
                   <button
-                    disabled={done}
+                    disabled={done || !t}
                     onClick={() => setB({ t: b.t === t ? null : t })}
                     className={
                       "flex flex-1 items-center justify-center gap-1.5 truncate rounded-lg border px-2 py-1.5 text-xs " +
-                      (done && m.w === t
+                      (!t
+                        ? "cursor-default border-slate-800 text-slate-500"
+                        : done && m.w === t
                         ? "border-emerald-500 bg-emerald-500 bg-opacity-20 text-emerald-300"
                         : b.t === t
                           ? "border-sky-400 bg-sky-500 bg-opacity-20 text-sky-200"
                           : "border-slate-700 text-slate-300" + (done ? "" : " hover:border-slate-500"))
                     }
                   >
-                    <Flag code={t} /><TName code={t} />
+                    <CompetitorName competitor={competitor} />
                   </button>
-                );
+                  );
+                };
                 const PerBtn = ({ v, label }) => (
                   <button
-                    disabled={done}
+                    disabled={done || !canBet}
                     onClick={() => setB({ p: b.p === v ? null : v })}
                     className={
                       "flex-1 rounded-lg border px-2 py-1 text-xs " +
@@ -1163,9 +1188,9 @@ function KoBets({ draft, setDraft, results, othersForKo, koLocks }) {
                 return (
                   <div key={m.id} className="rounded-xl border border-slate-800 bg-slate-950 p-2">
                     <div className="flex items-center gap-1.5">
-                      <TeamBtn t={m.t1} />
-                      <span className="text-xs text-slate-600">⚔️</span>
-                      <TeamBtn t={m.t2} />
+                      <TeamBtn competitor={m.a} />
+                      <span className="text-xs text-slate-600">נגד</span>
+                      <TeamBtn competitor={m.b} />
                     </div>
                     <div className="mt-1.5 flex items-center gap-1.5">
                       <span className="text-xs text-slate-500">עולה:</span>
@@ -2747,16 +2772,78 @@ function AiChat({ config, results, betsAll, me, liveMeta }) {
 /* ================= APP ================= */
 
 const TABS = [
-  { k: "table", n: "טבלה", icon: Trophy },
-  { k: "teams", n: "נבחרות", icon: ListOrdered },
-  { k: "bets", n: "ההימורים שלי", icon: Target },
-  { k: "draft", n: "דראפט", icon: Shuffle },
-  { k: "sim", n: "סימולציה", icon: FlaskConical },
-  { k: "manage", n: "ניהול", icon: Settings },
-  { k: "rules", n: "חוקים", icon: BookOpen },
+  { k: "table", labelKey: "tabTable", icon: Trophy },
+  { k: "teams", labelKey: "tabTeams", icon: ListOrdered },
+  { k: "bets", labelKey: "tabBets", icon: Target },
+  { k: "draft", labelKey: "tabDraft", icon: Shuffle },
+  { k: "sim", labelKey: "tabSim", icon: FlaskConical },
+  { k: "manage", labelKey: "tabManage", icon: Settings },
+  { k: "rules", labelKey: "tabRules", icon: BookOpen },
 ];
 
-export default function App() {
+function LanguageToggle() {
+  const { locale, locales, setLocale, t } = useLocale();
+  return (
+    <div className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-950/70 p-1" aria-label={t("language")}>
+      <Languages size={14} className="mx-1 text-slate-500" />
+      {Object.entries(locales).map(([key, info]) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => setLocale(key)}
+          className={
+            "rounded-full px-2 py-1 text-[11px] font-black transition-colors " +
+            (locale === key ? "bg-sky-500 text-slate-950" : "text-slate-400 hover:text-slate-100")
+          }
+        >
+          {info.short}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DashboardOverview({ config, scores, teamRows, liveMatches, me }) {
+  const { t } = useLocale();
+  const leader = scores?.rows?.[0];
+  const meRow = scores?.rows?.find((row) => row.p.id === me);
+  const activeTeams = teamRows.filter((row) => row.canScoreMore).length;
+
+  return (
+    <div className="grid gap-3 md:grid-cols-4">
+      <StatCard
+        label={t("overviewLeader")}
+        value={leader && leader.total > 0 ? leader.p.name : t("overviewLeaderFallback")}
+        detail={leader && leader.total > 0 ? `${leader.total} ${t("lbTotal").toLowerCase()}` : undefined}
+        tone="amber"
+        icon={<Trophy size={18} />}
+      />
+      <StatCard
+        label={t("overviewPlayers")}
+        value={config.players.length}
+        tone="sky"
+        icon={<Users size={18} />}
+      />
+      <StatCard
+        label={t("overviewActiveTeams")}
+        value={activeTeams}
+        detail={`${teamRows.length} ${t("teamsTotal").toLowerCase()}`}
+        tone="emerald"
+        icon={<ListOrdered size={18} />}
+      />
+      <StatCard
+        label={t("overviewMyScore")}
+        value={meRow ? meRow.total : "—"}
+        detail={liveMatches.length ? `${liveMatches.length} ${t("overviewLive").toLowerCase()}` : t("noLiveMatches")}
+        tone={liveMatches.length ? "emerald" : "slate"}
+        icon={<Target size={18} />}
+      />
+    </div>
+  );
+}
+
+function AppContent() {
+  const { dir, locale, t } = useLocale();
   const [leagueId, setLeagueId] = useState(() =>
     typeof location !== "undefined" ? decodeURIComponent(location.hash.replace(/^#\/?/, "")) || null : null
   );
@@ -2884,101 +2971,122 @@ export default function App() {
 
   const meName = config?.players?.find((p) => p.id === me)?.name;
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.title = config?.name ? `${config.name} · ${t("appTitleSuffix")}` : t("appTitle");
+  }, [config?.name, locale, t]);
+
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-950 pb-10 text-slate-100" style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
+    <div dir={dir} className="app-matchday-bg min-h-screen pb-10 text-slate-100" style={{ fontFamily: "var(--font-sans)" }}>
       {/* host tricolor */}
       <div className="flex h-1">
         <div className="flex-1 bg-emerald-500" /><div className="flex-1 bg-rose-500" /><div className="flex-1 bg-sky-500" />
       </div>
 
-      <header className="mx-auto max-w-3xl px-4 pb-2 pt-4">
-        <div className="flex items-center justify-between gap-3 md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-black tracking-tight text-slate-50">
-              {config?.name || "מונדיאל 2026"} <span className="text-base">🇺🇸🇨🇦🇲🇽</span>
-            </h1>
-            <p className="text-xs text-slate-500">ליגת הימורים · מונדיאל 2026</p>
-          </div>
+      <header className="app-shell pb-3 pt-4">
+        <Card className="hero-panel p-4 md:p-5">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="flex min-w-0 items-center gap-3">
+              <img src="/icon-192.png" alt="" className="h-11 w-11 shrink-0 rounded-2xl border border-slate-700 bg-slate-950/80 p-1 shadow-lg" />
+              <div className="min-w-0">
+                <Pill tone="sky" className="mb-2">{t("productKicker")}</Pill>
+                <h1 className="truncate text-2xl font-black tracking-tight text-slate-50 md:text-3xl">
+              {config?.name || t("defaultLeague")} <span className="text-base">🇺🇸🇨🇦🇲🇽</span>
+                </h1>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">{t("heroCopy")}</p>
+              </div>
+            </div>
 
-          <LiveMatchPills
-            matches={liveMatches}
-            className="hidden max-w-xs flex-col md:flex"
-          />
-
-          <div className="flex items-center justify-end gap-2">
-            {meName && (
-              <button
-                onClick={() => pickMe(null)}
-                title="החלפת שחקן"
-                className="flex items-center gap-1.5 rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-500"
+            <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+              <LanguageToggle />
+              {meName && (
+                <button
+                  onClick={() => pickMe(null)}
+                  title={t("switchPlayer")}
+                  className="flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1.5 text-xs text-slate-300 transition-colors hover:border-slate-500"
+                >
+                  <Users size={12} /> {meName}
+                </button>
+              )}
+              {leagueId && config && (
+                <button
+                  onClick={copyLink}
+                  title={t("copyLeagueLink")}
+                  className="flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1.5 text-xs text-slate-300 transition-colors hover:border-slate-500"
+                >
+                  {copied ? <Check size={12} className="text-emerald-400" /> : <Link2 size={12} />}
+                  {copied ? t("copied") : t("friendsLink")}
+                </button>
+              )}
+              <span
+                title={connected ? t("syncedLive") : t("disconnected")}
+                className={"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-bold " + (connected ? "border-emerald-800 bg-emerald-950/70 text-emerald-300" : "border-slate-800 bg-slate-950/70 text-slate-500")}
               >
-                <Users size={12} /> {meName}
-              </button>
-            )}
-            {leagueId && config && (
-              <button
-                onClick={copyLink}
-                title="העתקת קישור הליגה"
-                className="flex items-center gap-1.5 rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-500"
-              >
-                {copied ? <Check size={12} className="text-emerald-400" /> : <Link2 size={12} />}
-                {copied ? "הועתק!" : "קישור לחברים"}
-              </button>
-            )}
-            {connected ? (
-              <span title="מסונכרן חי" className="relative flex h-2 w-2 shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                <span className="relative flex h-2 w-2 shrink-0">
+                  {connected && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}
+                  <span className={"relative inline-flex h-2 w-2 rounded-full " + (connected ? "bg-emerald-400" : "bg-slate-600")} />
+                </span>
+                {connected ? t("syncedLive") : t("disconnected")}
               </span>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-x-auto pb-1">
+            {liveMatches.length ? (
+              <LiveMatchPills matches={liveMatches} className="flex w-max flex-row" />
             ) : (
-              <span title="מנותק" className="h-2 w-2 shrink-0 rounded-full bg-slate-600" />
+              <Pill tone="slate">{t("noLiveMatches")}</Pill>
             )}
           </div>
-        </div>
-
-        <div className="-mx-1 mt-2 overflow-x-auto px-1 pb-1 md:hidden">
-          <LiveMatchPills matches={liveMatches} className="flex w-max flex-row" />
-        </div>
+        </Card>
       </header>
 
       {!dbReady && (
-        <div className="mx-auto mb-2 max-w-3xl px-4">
+        <div className="app-shell mb-2">
           <div className="rounded-xl border border-amber-600 bg-amber-500 bg-opacity-10 px-3 py-2 text-xs text-amber-300">
-            ⚠️ חסרה הגדרת Firebase — מלאו את קובץ ‎.env‎ לפי ההוראות ב־README והפעילו מחדש.
+            ⚠️ {t("firebaseMissing")}
           </div>
         </div>
       )}
 
-      <main className="mx-auto max-w-3xl px-4">
+      <main className="app-shell">
         {loading ? (
-          <div className="py-20 text-center text-slate-500">טוען את הליגה…</div>
+          <EmptyState title={t("loadingLeague")} />
         ) : !leagueId ? (
           <SetupScreen onCreate={createLeague} />
         ) : !config ? (
-          <div className="mx-auto max-w-md py-16 text-center">
-            <p className="mb-4 text-sm text-slate-400">הליגה לא נמצאה — ייתכן שהקישור שגוי או שהיא אופסה.</p>
-            <button
-              onClick={() => { location.hash = ""; }}
-              className="rounded-xl bg-sky-500 px-5 py-2 font-bold text-slate-950 hover:bg-sky-400"
-            >
-              פתיחת ליגה חדשה
-            </button>
-          </div>
+          <EmptyState
+            title={t("openNewLeague")}
+            body={t("leagueMissing")}
+            action={<Button onClick={() => { location.hash = ""; }}>{t("openNewLeague")}</Button>}
+          />
         ) : !me ? (
           <IdentityScreen players={config.players} onPick={pickMe} />
         ) : (
           <>
-            <nav className="mb-4 mt-2 flex gap-1 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900 p-1">
-              {TABS.map((t) => (
+            {scores && (
+              <div className="mb-4">
+                <DashboardOverview
+                  config={config}
+                  scores={scores}
+                  teamRows={teamRows}
+                  liveMatches={liveMatches}
+                  me={me}
+                />
+              </div>
+            )}
+
+            <nav className="mb-4 mt-2 flex gap-1 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/85 p-1 shadow-[0_18px_60px_rgba(2,6,23,0.24)] backdrop-blur">
+              {TABS.map((tabInfo) => (
                 <button
-                  key={t.k}
-                  onClick={() => setTab(t.k)}
+                  key={tabInfo.k}
+                  onClick={() => setTab(tabInfo.k)}
                   className={
                     "flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2 py-2 text-xs font-bold transition-colors " +
-                    (tab === t.k ? "bg-slate-700 text-slate-50" : "text-slate-400 hover:text-slate-200")
+                    (tab === tabInfo.k ? "bg-slate-700 text-slate-50" : "text-slate-400 hover:text-slate-200")
                   }
                 >
-                  <t.icon size={14} /> {t.n}
+                  <tabInfo.icon size={14} /> {t(tabInfo.labelKey)}
                 </button>
               ))}
             </nav>

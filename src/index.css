@@ -2,9 +2,118 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --surface-canvas: #020617;
+  --surface-card: #0f172a;
+  --surface-inset: #1e293b;
+  --surface-field: #020617;
+  --surface-raised: #334155;
+  --border-subtle: #1e293b;
+  --border-default: #334155;
+  --border-strong: #475569;
+  --border-focus: #0ea5e9;
+  --text-heading: #f8fafc;
+  --text-strong: #f1f5f9;
+  --text-body: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-meta: #64748b;
+  --text-faint: #475569;
+  --text-on-accent: #020617;
+  --state-live: #34d399;
+  --state-leader: #fbbf24;
+  --state-leader-text: #fcd34d;
+  --host-1: #10b981;
+  --host-2: #f43f5e;
+  --host-3: #0ea5e9;
+  --font-sans: system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --transition-colors: color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 html {
-  background: #020617;
+  background: var(--surface-canvas);
+}
+
+body {
+  margin: 0;
+  background: var(--surface-canvas);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.app-matchday-bg {
+  background:
+    linear-gradient(90deg, rgb(51 65 85 / 0.10) 1px, transparent 1px),
+    linear-gradient(180deg, rgb(51 65 85 / 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%);
+  background-size: 48px 48px, 48px 48px, auto;
+}
+
+.app-shell {
+  width: min(100%, 1180px);
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgb(16 185 129 / 0.16), transparent 22%),
+    linear-gradient(270deg, rgb(14 165 233 / 0.14), transparent 28%);
+  opacity: 0.8;
+}
+
+.hero-panel > * {
+  position: relative;
+}
+
+.score-meter {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgb(30 41 59 / 0.9);
+}
+
+.score-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #34d399, #fbbf24);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
