@@ -20,6 +20,7 @@ import {
   recordKoBetPoints,
   summarizeScoreBreakdown,
 } from "./scoreBreakdown";
+import { buildLockedPicksComparison } from "./picksComparison";
 import {
   ALL_GROUP_FIXTURES,
   ALL_TEAMS,
@@ -1325,6 +1326,289 @@ function MyBets({ me, config, results, betsAll, reach, eliminatedTeams, onSaveBe
           setSaving(false);
         }}
       />
+    </div>
+  );
+}
+
+/* ================= COMPARE LOCKED PICKS ================= */
+
+const BRACKET_TIER_LABEL_KEYS = {
+  r32: "compareTierR32",
+  r16: "compareTierR16",
+  qf: "compareTierQf",
+  sf: "compareTierSf",
+  fin: "compareTierFin",
+  win: "compareTierWin",
+};
+
+const KO_ROUND_LABEL_KEYS = {
+  r32: "compareKoR32",
+  r16: "compareKoR16",
+  qf: "compareKoQf",
+  sf: "compareKoSf",
+  p3: "compareKoP3",
+  f: "compareKoFinal",
+};
+
+function PlayerChips({ players, ids, emptyLabel }) {
+  if (!ids?.length) return <span className="text-xs text-slate-600">{emptyLabel}</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {ids.map((id) => {
+        const idx = players.findIndex((player) => player.id === id);
+        const player = idx >= 0 ? players[idx] : { id, name: id };
+        return (
+          <span key={id} className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-950 px-2 py-1 text-xs text-slate-300">
+            <PlayerDot player={player} idx={idx >= 0 ? idx : 0} />
+            <span className="max-w-24 truncate">{player.name}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function LockedStageNotice({ title, body }) {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-dashed border-slate-700 bg-slate-900/70 p-4">
+      <div className="rounded-xl border border-slate-800 bg-slate-950 p-2 text-slate-500">
+        <Lock size={16} />
+      </div>
+      <div>
+        <div className="text-sm font-bold text-slate-300">{title}</div>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function BracketRoundComparison({ round, players }) {
+  const { t, teamName } = useLocale();
+  const totalPlayers = Math.max(players.length, 1);
+  const label = t(BRACKET_TIER_LABEL_KEYS[round.tierKey] || round.tierKey);
+  const totalSelections = round.rows.reduce((sum, row) => sum + row.count, 0);
+
+  return (
+    <Section
+      title={label}
+      badge={`${totalSelections}/${totalPlayers}`}
+      defaultOpen={["win", "fin", "sf"].includes(round.tierKey)}
+    >
+      {round.rows.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-800 p-3 text-sm text-slate-500">
+          {t("compareNoTournamentPicks")}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {round.rows.map((row) => (
+            <div key={row.team} className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Flag code={row.team} lg />
+                  <span className="truncate text-sm font-black text-slate-100">
+                    {teamName(row.team, T[row.team]?.[0] || row.team)}
+                  </span>
+                </div>
+                <div className="font-mono text-sm font-black text-sky-300">
+                  {row.count}/{players.length} · {row.pct}%
+                </div>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                <div className="h-full rounded-full bg-sky-400" style={{ width: `${row.pct}%` }} />
+              </div>
+              <div className="mt-2">
+                <PlayerChips players={players} ids={row.playerIds} emptyLabel={t("compareNoPlayers")} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {round.missingPlayerIds.length > 0 && (
+        <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-3">
+          <div className="mb-2 text-xs font-bold text-slate-500">{t("compareMissingPlayers")}</div>
+          <PlayerChips players={players} ids={round.missingPlayerIds} emptyLabel={t("compareNoPlayers")} />
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function MatchBucketRow({ label, ids, players, tone = "slate" }) {
+  const { t } = useLocale();
+  const tones = {
+    slate: "border-slate-800 bg-slate-950 text-slate-300",
+    sky: "border-sky-900 bg-sky-950/40 text-sky-200",
+    emerald: "border-emerald-900 bg-emerald-950/40 text-emerald-200",
+    amber: "border-amber-900 bg-amber-950/40 text-amber-200",
+  };
+  return (
+    <div className={"rounded-xl border p-2.5 " + (tones[tone] || tones.slate)}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-bold">{label}</span>
+        <span className="rounded-full bg-slate-950/80 px-2 py-0.5 font-mono text-xs">{ids.length}</span>
+      </div>
+      <PlayerChips players={players} ids={ids} emptyLabel={t("compareNoPlayers")} />
+    </div>
+  );
+}
+
+function GroupMatchComparison({ match, players }) {
+  const { t, teamName } = useLocale();
+  const leftName = teamName(match.t1, T[match.t1]?.[0] || match.t1);
+  const rightName = teamName(match.t2, T[match.t2]?.[0] || match.t2);
+  const sc = scoreOf(match.result);
+
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-bold text-slate-100">
+          <Flag code={match.t1} />
+          <span className="truncate">{leftName}</span>
+          <span className="text-slate-600">vs</span>
+          <Flag code={match.t2} />
+          <span className="truncate">{rightName}</span>
+        </div>
+        <Pill tone={match.result ? "emerald" : "slate"}>
+          {sc ? `${sc[0]}:${sc[1]}` : match.result || t("compareUpcoming")}
+        </Pill>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <MatchBucketRow label={t("comparePickWin", { team: leftName })} ids={match.buckets["1"]} players={players} tone="sky" />
+        <MatchBucketRow label={t("comparePickDraw")} ids={match.buckets.X} players={players} tone="amber" />
+        <MatchBucketRow label={t("comparePickWin", { team: rightName })} ids={match.buckets["2"]} players={players} tone="sky" />
+        <MatchBucketRow label={t("compareNoPick")} ids={match.buckets.none} players={players} />
+      </div>
+    </div>
+  );
+}
+
+function KoMatchComparison({ match, players }) {
+  const { t, teamName } = useLocale();
+  const teams = [match.t1, match.t2, ...Object.keys(match.winnerBuckets || {})]
+    .filter(Boolean)
+    .filter((team, index, arr) => arr.indexOf(team) === index);
+
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-bold text-slate-100">
+          <Flag code={match.t1} />
+          <span className="truncate">{teamName(match.t1, T[match.t1]?.[0] || match.t1)}</span>
+          <span className="text-slate-600">vs</span>
+          <Flag code={match.t2} />
+          <span className="truncate">{teamName(match.t2, T[match.t2]?.[0] || match.t2)}</span>
+        </div>
+        <Pill tone={match.winner ? "emerald" : "slate"}>
+          {match.winner
+            ? t("compareWinner", { team: teamName(match.winner, T[match.winner]?.[0] || match.winner) })
+            : t("compareUpcoming")}
+        </Pill>
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-bold text-slate-500">{t("compareWinnerPicks")}</div>
+          {teams.map((team) => (
+            <MatchBucketRow
+              key={team}
+              label={teamName(team, T[team]?.[0] || team)}
+              ids={match.winnerBuckets[team] || []}
+              players={players}
+              tone={match.winner === team ? "emerald" : "sky"}
+            />
+          ))}
+          <MatchBucketRow label={t("compareNoPick")} ids={match.none} players={players} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-bold text-slate-500">{t("compareMethodPicks")}</div>
+          <MatchBucketRow label={t("compareMethod90")} ids={match.methodBuckets["90"]} players={players} tone={match.method === "90" ? "emerald" : "slate"} />
+          <MatchBucketRow label={t("compareMethodEt")} ids={match.methodBuckets.et} players={players} tone={match.method === "et" ? "emerald" : "slate"} />
+          <MatchBucketRow label={t("compareNoMethod")} ids={match.methodBuckets.none} players={players} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ComparisonTab({ config, comparison, onEditOpenPicks }) {
+  const { t } = useLocale();
+  const players = config.players || [];
+
+  if (!comparison?.bracketAvailable) {
+    return (
+      <EmptyState
+        title={t("compareLockedTitle")}
+        body={t("compareLockedBody")}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <Pill tone="emerald">{t("compareUnlocked")}</Pill>
+            <h2 className="mt-2 text-xl font-black text-slate-50">{t("compareTitle")}</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">{t("compareIntro")}</p>
+          </div>
+          <Button onClick={onEditOpenPicks} variant="ghost" icon={<Target size={14} />}>
+            {t("compareEditOpenPicks")}
+          </Button>
+        </div>
+      </Card>
+
+      <div className="flex flex-col gap-2">
+        <div className="px-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+          {t("compareTournamentSection")}
+        </div>
+        {comparison.bracketRounds.map((round) => (
+          <BracketRoundComparison key={round.tierKey} round={round} players={players} />
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+          <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+            {t("compareMatchesSection")}
+          </div>
+          <Pill tone="slate">{t("compareLockedOnly")}</Pill>
+        </div>
+
+        {comparison.groupMatches.length > 0 ? (
+          <Section title={t("compareGroupStage")} badge={comparison.groupMatches.length} defaultOpen={false}>
+            <div className="flex flex-col gap-2">
+              {comparison.groupMatches.map((match) => (
+                <GroupMatchComparison key={match.id} match={match} players={players} />
+              ))}
+            </div>
+          </Section>
+        ) : (
+          <LockedStageNotice title={t("compareGroupStage")} body={t("compareGroupLockedHint")} />
+        )}
+
+        {comparison.koRounds.map((round) => {
+          const title = t(KO_ROUND_LABEL_KEYS[round.roundKey] || round.roundKey);
+          if (!round.locked) {
+            return <LockedStageNotice key={round.roundKey} title={title} body={t("compareKoLockedHint")} />;
+          }
+          return (
+            <Section key={round.roundKey} title={title} badge={round.matches.length} defaultOpen={round.matches.length > 0}>
+              {round.matches.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-800 p-3 text-sm text-slate-500">
+                  {t("compareNoLockedMatches")}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {round.matches.map((match) => (
+                    <KoMatchComparison key={match.id} match={match} players={players} />
+                  ))}
+                </div>
+              )}
+            </Section>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2811,6 +3095,7 @@ const TABS = [
   { k: "table", labelKey: "tabTable", icon: Trophy },
   { k: "teams", labelKey: "tabTeams", icon: ListOrdered },
   { k: "bets", labelKey: "tabBets", icon: Target },
+  { k: "compare", labelKey: "tabCompare", icon: Users, requiresBracketLock: true },
   { k: "draft", labelKey: "tabDraft", icon: Shuffle },
   { k: "sim", labelKey: "tabSim", icon: FlaskConical },
   { k: "manage", labelKey: "tabManage", icon: Settings },
@@ -3004,6 +3289,18 @@ function AppContent() {
     () => selectLiveMatches({ results, liveMeta }),
     [results, liveMeta],
   );
+  const comparison = useMemo(
+    () => (config ? buildLockedPicksComparison({ config, results, betsAll }) : null),
+    [config, results, betsAll],
+  );
+  const visibleTabs = useMemo(
+    () => TABS.filter((tabInfo) => !tabInfo.requiresBracketLock || !!config?.locks?.bracket),
+    [config?.locks?.bracket],
+  );
+
+  useEffect(() => {
+    if (tab === "compare" && !config?.locks?.bracket) setTab("table");
+  }, [tab, config?.locks?.bracket]);
 
   const meName = config?.players?.find((p) => p.id === me)?.name;
 
@@ -3114,7 +3411,7 @@ function AppContent() {
             )}
 
             <nav className="mb-4 mt-2 flex gap-1 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/85 p-1 shadow-[0_18px_60px_rgba(2,6,23,0.24)] backdrop-blur">
-              {TABS.map((tabInfo) => (
+              {visibleTabs.map((tabInfo) => (
                 <button
                   key={tabInfo.k}
                   onClick={() => setTab(tabInfo.k)}
@@ -3146,6 +3443,15 @@ function AppContent() {
                   reach={scores.reach}
                   eliminatedTeams={eliminatedTeams}
                   onSaveBets={saveMyBets}
+                />
+              )}
+            </div>
+            <div className={tab === "compare" ? "" : "hidden"}>
+              {comparison && (
+                <ComparisonTab
+                  config={config}
+                  comparison={comparison}
+                  onEditOpenPicks={() => setTab("bets")}
                 />
               )}
             </div>
