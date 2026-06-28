@@ -429,6 +429,42 @@ const TName = ({ code }) => {
   return <span>{teamName(code, T[code]?.[0] || code)}</span>;
 };
 
+const HOST_TEAMS = ["USA", "CAN", "MEX"];
+const BRAND_ICON_SRC = `${import.meta.env.BASE_URL || "/"}icon-192.png`;
+
+function HostFlags({ className = "" }) {
+  return (
+    <span dir="ltr" className={"inline-flex items-center gap-1.5 align-middle " + className} aria-label="USA, Canada, Mexico">
+      {HOST_TEAMS.map((code) => (
+        <span key={code} className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1 text-[11px] font-black text-slate-200">
+          <Flag code={code} lg />
+          <span dir="ltr">{code}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function HostMark() {
+  const [imageOk, setImageOk] = useState(true);
+  return (
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-950/80 p-1 shadow-lg">
+      {imageOk ? (
+        <img
+          src={BRAND_ICON_SRC}
+          alt=""
+          className="h-full w-full rounded-xl object-cover"
+          onError={() => setImageOk(false)}
+        />
+      ) : (
+        <div className="flex flex-col gap-0.5" aria-hidden="true">
+          {HOST_TEAMS.map((code) => <Flag key={code} code={code} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LiveMatchPills({ matches, className = "" }) {
   const { t } = useLocale();
   if (!matches.length) return null;
@@ -2987,12 +3023,13 @@ function AppContent() {
         <Card className="hero-panel p-4 md:p-5">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="flex min-w-0 items-center gap-3">
-              <img src="/icon-192.png" alt="" className="h-11 w-11 shrink-0 rounded-2xl border border-slate-700 bg-slate-950/80 p-1 shadow-lg" />
+              <HostMark />
               <div className="min-w-0">
                 <Pill tone="sky" className="mb-2">{t("productKicker")}</Pill>
                 <h1 className="truncate text-2xl font-black tracking-tight text-slate-50 md:text-3xl">
-              {config?.name || t("defaultLeague")} <span className="text-base">🇺🇸🇨🇦🇲🇽</span>
+                  {config?.name || t("defaultLeague")}
                 </h1>
+                <HostFlags className="mt-2" />
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">{t("heroCopy")}</p>
               </div>
             </div>
