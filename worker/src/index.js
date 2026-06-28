@@ -80,13 +80,17 @@ export async function syncLiveScores(env, { now = Date.now(), dryRun = false } =
     return { status: "idle", scheduleSize: Object.keys(schedule).length, writes: 0 };
   }
 
-  const [existingResults, liveMeta] = await Promise.all([
+  const [groupResults, koResults, liveMeta] = await Promise.all([
     readFirebase(env, "results/g"),
+    readFirebase(env, "results/ko"),
     readFirebase(env, "liveMeta/g"),
   ]);
   const scorePatch = buildFirebasePatch({
     events,
-    existingResults: existingResults || {},
+    existingResults: {
+      g: groupResults || {},
+      ko: koResults || {},
+    },
     liveMeta: liveMeta || {},
     now,
   });
@@ -110,7 +114,9 @@ export async function syncLiveScores(env, { now = Date.now(), dryRun = false } =
   return {
     status: dryRun ? "dry-run" : "synced",
     scheduleSize: Object.keys(schedule).length,
-    writes: Object.keys(scorePatch).filter((key) => key.startsWith("results/g/")).length,
+    writes: Object.keys(scorePatch).filter((key) =>
+      key.startsWith("results/g/") || /^results\/ko\/[^/]+\/score$/.test(key)
+    ).length,
   };
 }
 

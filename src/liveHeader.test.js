@@ -95,3 +95,41 @@ test("sorts simultaneous live matches by kickoff and fixture id", () => {
 
   assert.deepEqual(matches.map(({ id }) => id), ["B-2", "D-5", "E-5"]);
 });
+
+test("selects scored automatic live knockout matches", () => {
+  const matches = selectLiveMatches({
+    results: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+          score: "2-1",
+        },
+      },
+    },
+    liveMeta: {
+      m79: {
+        source: "espn",
+        status: "live",
+        manualOverride: false,
+        kickoff: "2026-07-01T20:00:00Z",
+        displayClock: "67'",
+      },
+    },
+  });
+
+  assert.deepEqual(matches, [
+    {
+      id: "m79",
+      t1: "MEX",
+      t2: "CZE",
+      score: "1-2",
+      kickoff: "2026-07-01T20:00:00Z",
+      displayClock: "67'",
+    },
+  ]);
+});

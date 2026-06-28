@@ -1,4 +1,5 @@
 import { ALL_GROUP_FIXTURES } from "./worldCupData.js";
+import { buildKnockoutSchedule } from "./bracketSchedule.js";
 
 const FIXTURES_BY_ID = new Map(
   ALL_GROUP_FIXTURES.map((fixture) => [fixture.id, fixture]),
@@ -17,11 +18,23 @@ function scoreForVisualOrder(score) {
 
 export function selectLiveMatches({ results, liveMeta }) {
   const groupResults = results?.g || {};
+  const koResults = results?.ko || {};
+  const knockoutMatches = new Map(
+    buildKnockoutSchedule(results).map((match) => [match.id, match]),
+  );
 
   return Object.entries(liveMeta || {})
     .flatMap(([fixtureId, meta]) => {
-      const fixture = FIXTURES_BY_ID.get(fixtureId);
-      const score = groupResults[fixtureId];
+      let fixture = FIXTURES_BY_ID.get(fixtureId);
+      let score = groupResults[fixtureId];
+
+      if (!fixture) {
+        const knockoutMatch = knockoutMatches.get(fixtureId);
+        if (knockoutMatch?.t1 && knockoutMatch?.t2) {
+          fixture = knockoutMatch;
+          score = koResults[fixtureId]?.score || knockoutMatch.score;
+        }
+      }
 
       if (
         !fixture ||

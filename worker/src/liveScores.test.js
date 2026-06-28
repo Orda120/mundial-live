@@ -43,15 +43,17 @@ const espnEvent = ({
   }],
 });
 
-test("extracts only group-stage events into the cached schedule", () => {
+test("extracts group and knockout tournament events into the cached schedule", () => {
   const schedule = extractSchedule([
     espnEvent({ id: "1" }),
     espnEvent({ id: "2", type: "round-of-32" }),
   ]);
 
-  assert.deepEqual(Object.keys(schedule), ["1"]);
+  assert.deepEqual(Object.keys(schedule), ["1", "2"]);
   assert.equal(schedule["1"].home, "QAT");
   assert.equal(schedule["1"].away, "SUI");
+  assert.equal(schedule["2"].home, "QAT");
+  assert.equal(schedule["2"].away, "SUI");
 });
 
 test("opens the polling window ten minutes before kickoff and closes four hours later", () => {
@@ -84,10 +86,12 @@ test("normalizes ESPN live and final events", () => {
   assert.deepEqual(normalizeEspnEvent(espnEvent()), {
     providerFixtureId: "760420",
     kickoff: "2026-06-13T19:00:00Z",
+    stage: "group",
     home: "QAT",
     away: "SUI",
     homeScore: 0,
     awayScore: 1,
+    winner: null,
     status: "live",
     displayClock: "52'",
   });
@@ -163,4 +167,51 @@ test("pre-match and malformed responses do not clear known scores", () => {
   });
 
   assert.deepEqual(patch, {});
+});
+
+test("writes knockout live scores into matching knockout result records", () => {
+  const now = Date.parse("2026-07-01T20:30:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        type: "round-of-32",
+        home: "CZE",
+        away: "MEX",
+        homeScore: "1",
+        awayScore: "2",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+        },
+      },
+    },
+    liveMeta: {},
+    now,
+  });
+
+  assert.equal(patch["results/ko/m79/round"], "r32");
+  assert.equal(patch["results/ko/m79/matchNo"], 79);
+  assert.equal(patch["results/ko/m79/scheduled"], true);
+  assert.equal(patch["results/ko/m79/t1"], "MEX");
+  assert.equal(patch["results/ko/m79/t2"], "CZE");
+  assert.equal(patch["results/ko/m79/score"], "2-1");
+  assert.deepEqual(patch["liveMeta/g/m79"], {
+    source: "espn",
+    status: "live",
+    providerFixtureId: "900001",
+    kickoff: "2026-07-01T20:00:00Z",
+    displayClock: "52'",
+    updatedAt: now,
+    manualOverride: false,
+  });
 });
