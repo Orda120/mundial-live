@@ -82,6 +82,25 @@ test("refreshes the full schedule twice per day", () => {
   assert.equal(shouldRefreshSchedule(now - 11 * 60 * 60 * 1000, now), false);
 });
 
+test("refreshes a group-only schedule cache after its polling windows are exhausted", () => {
+  const now = Date.parse("2026-06-30T06:30:00Z");
+  const groupOnlySchedule = extractSchedule([
+    espnEvent({ id: "760485", date: "2026-06-28T02:00:00Z" }),
+  ]);
+  const expandedSchedule = extractSchedule([
+    espnEvent({ id: "760485", date: "2026-06-28T02:00:00Z" }),
+    espnEvent({
+      id: "760486",
+      date: "2026-06-28T19:00:00Z",
+      type: "round-of-32",
+    }),
+  ]);
+
+  assert.equal(shouldRefreshSchedule(now - 31 * 60 * 1000, now, groupOnlySchedule), true);
+  assert.equal(shouldRefreshSchedule(now - 29 * 60 * 1000, now, groupOnlySchedule), false);
+  assert.equal(shouldRefreshSchedule(now - 31 * 60 * 1000, now, expandedSchedule), false);
+});
+
 test("normalizes ESPN live and final events", () => {
   assert.deepEqual(normalizeEspnEvent(espnEvent()), {
     providerFixtureId: "760420",
@@ -213,5 +232,182 @@ test("writes knockout live scores into matching knockout result records", () => 
     displayClock: "52'",
     updatedAt: now,
     manualOverride: false,
+  });
+});
+
+test("fills an ESPN knockout score when only the winner was saved for bracket progression", () => {
+  const now = Date.parse("2026-07-01T20:30:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "CZE",
+        away: "MEX",
+        homeScore: "1",
+        awayScore: "2",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+          w: "MEX",
+        },
+      },
+    },
+    liveMeta: {},
+    now,
+  });
+
+  assert.equal(patch["results/ko/m79/score"], "2-1");
+  assert.equal(patch["results/ko/m79/w"], "MEX");
+  assert.deepEqual(patch["liveMeta/g/m79"], {
+    source: "espn",
+    status: "finished",
+    providerFixtureId: "900001",
+    kickoff: "2026-07-01T20:00:00Z",
+    displayClock: "52'",
+    updatedAt: now,
+    manualOverride: false,
+  });
+});
+
+test("recovers a winner-only knockout match that was previously tagged as manual", () => {
+  const now = Date.parse("2026-07-01T20:30:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "CZE",
+        away: "MEX",
+        homeScore: "1",
+        awayScore: "2",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+          w: "MEX",
+        },
+      },
+    },
+    liveMeta: {
+      m79: {
+        source: "manual",
+        status: "manual",
+        manualOverride: true,
+        updatedAt: now - 1,
+      },
+    },
+    now,
+  });
+
+  assert.equal(patch["results/ko/m79/score"], "2-1");
+  assert.equal(patch["liveMeta/g/m79"].source, "espn");
+  assert.equal(patch["liveMeta/g/m79"].manualOverride, false);
+});
+
+test("fills an ESPN knockout score when winner and method were saved without a score", () => {
+  const now = Date.parse("2026-07-01T20:30:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "CZE",
+        away: "MEX",
+        homeScore: "1",
+        awayScore: "2",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+          w: "MEX",
+          p: "90",
+        },
+      },
+    },
+    liveMeta: {
+      m79: {
+        source: "manual",
+        status: "manual",
+        manualOverride: true,
+        updatedAt: now - 1,
+      },
+    },
+    now,
+  });
+
+  assert.equal(patch["results/ko/m79/score"], "2-1");
+  assert.equal(patch["results/ko/m79/w"], "MEX");
+  assert.equal("results/ko/m79/p" in patch, false);
+});
+
+test("protects an existing knockout score without metadata as a manual override", () => {
+  const now = Date.parse("2026-07-01T20:30:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "CZE",
+        away: "MEX",
+        homeScore: "1",
+        awayScore: "2",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+          score: "9-9",
+          w: "MEX",
+          p: "90",
+        },
+      },
+    },
+    liveMeta: {},
+    now,
+  });
+
+  assert.equal("results/ko/m79/score" in patch, false);
+  assert.deepEqual(patch["liveMeta/g/m79"], {
+    source: "manual",
+    status: "manual",
+    updatedAt: now,
+    manualOverride: true,
   });
 });

@@ -68,7 +68,7 @@ export async function syncLiveScores(env, { now = Date.now(), dryRun = false } =
   let events = null;
   let refreshedSchedule = false;
 
-  if (shouldRefreshSchedule(syncState.lastScheduleAt, now)) {
+  if (shouldRefreshSchedule(syncState.lastScheduleAt, now, schedule)) {
     events = await fetchEspn(FULL_SCHEDULE_DATES);
     schedule = extractSchedule(events);
     refreshedSchedule = true;

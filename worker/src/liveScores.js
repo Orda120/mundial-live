@@ -3,9 +3,11 @@ import { buildKnockoutSchedule } from "../../src/bracketSchedule.js";
 
 const MINUTE = 60 * 1000;
 const SCHEDULE_REFRESH_MS = 12 * 60 * MINUTE;
+const SCHEDULE_CATCH_UP_REFRESH_MS = 30 * MINUTE;
 const POLL_INTERVAL_MS = 5 * MINUTE;
 const POLL_LEAD_MS = 10 * MINUTE;
 const POLL_TAIL_MS = 4 * 60 * MINUTE;
+const GROUP_STAGE_EVENT_COUNT = 72;
 
 function competitionOf(event) {
   return event?.competitions?.[0] || null;
@@ -46,8 +48,32 @@ export function extractSchedule(events) {
   return schedule;
 }
 
-export function shouldRefreshSchedule(lastScheduleAt, now) {
-  return !lastScheduleAt || now - lastScheduleAt >= SCHEDULE_REFRESH_MS;
+function latestKickoffAt(schedule) {
+  const kickoffs = Object.values(schedule || {})
+    .map(({ kickoff }) => Date.parse(kickoff))
+    .filter(Number.isFinite);
+
+  return kickoffs.length ? Math.max(...kickoffs) : null;
+}
+
+function hasCachedKnockoutEvents(schedule) {
+  const entries = Object.values(schedule || {});
+  return entries.length > GROUP_STAGE_EVENT_COUNT ||
+    entries.some(({ stage }) => stage === "knockout");
+}
+
+function shouldCatchUpSchedule(schedule, now) {
+  if (!schedule) return false;
+  if (hasCachedKnockoutEvents(schedule)) return false;
+  const latest = latestKickoffAt(schedule);
+  return latest == null || now > latest + POLL_TAIL_MS;
+}
+
+export function shouldRefreshSchedule(lastScheduleAt, now, schedule = null) {
+  if (!lastScheduleAt) return true;
+  if (now - lastScheduleAt >= SCHEDULE_REFRESH_MS) return true;
+  return now - lastScheduleAt >= SCHEDULE_CATCH_UP_REFRESH_MS &&
+    shouldCatchUpSchedule(schedule, now);
 }
 
 export function isPollingWindowOpen(schedule, now) {
@@ -156,6 +182,10 @@ function writeLiveMeta(patch, fixtureId, normalized, now) {
   };
 }
 
+function hasManualKnockoutScore(existingKo) {
+  return existingKo.score != null;
+}
+
 export function buildFirebasePatch({
   events,
   existingResults = {},
@@ -193,10 +223,13 @@ export function buildFirebasePatch({
     }
 
     const match = knockoutMatchForEvent(normalized, results);
-    if (!match || liveMeta[match.id]?.manualOverride) continue;
+    if (!match) continue;
 
     const existingKo = results.ko[match.id] || {};
-    if ((existingKo.score != null || existingKo.w || existingKo.p) && !liveMeta[match.id]) {
+    const manualKoScore = hasManualKnockoutScore(existingKo);
+    if (liveMeta[match.id]?.manualOverride && manualKoScore) continue;
+
+    if (manualKoScore && !liveMeta[match.id]) {
       patch[`liveMeta/g/${match.id}`] = {
         source: "manual",
         status: "manual",
