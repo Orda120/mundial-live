@@ -18,27 +18,33 @@ const espnEvent = ({
   away = "SUI",
   homeScore = "0",
   awayScore = "1",
+  homeWinner = undefined,
+  awayWinner = undefined,
   type = "group",
   displayClock = "52'",
+  period = state === "post" ? 2 : 1,
   shortDetail = state === "post" ? "FT" : "52'",
+  detail = shortDetail,
+  description = state === "post" ? "Full Time" : "In Progress",
 } = {}) => ({
   id,
   date,
   season: { type: 1 },
   status: {
     displayClock,
+    period,
     type: {
       state,
-      detail: shortDetail,
+      detail,
       shortDetail,
-      description: state === "post" ? "Final" : "In Progress",
+      description,
     },
   },
   competitions: [{
     type: { abbreviation: type },
     competitors: [
-      { homeAway: "home", score: homeScore, team: { abbreviation: home } },
-      { homeAway: "away", score: awayScore, team: { abbreviation: away } },
+      { homeAway: "home", score: homeScore, winner: homeWinner, team: { abbreviation: home } },
+      { homeAway: "away", score: awayScore, winner: awayWinner, team: { abbreviation: away } },
     ],
   }],
 });
@@ -111,6 +117,8 @@ test("normalizes ESPN live and final events", () => {
     homeScore: 0,
     awayScore: 1,
     winner: null,
+    period: 1,
+    statusText: "52' In Progress",
     status: "live",
     displayClock: "52'",
   });
@@ -410,4 +418,88 @@ test("protects an existing knockout score without metadata as a manual override"
     updatedAt: now,
     manualOverride: true,
   });
+});
+
+test("fills knockout method as regulation for finished matches that did not reach extra time", () => {
+  const now = Date.parse("2026-07-01T22:00:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "MEX",
+        away: "CZE",
+        homeScore: "2",
+        awayScore: "1",
+        homeWinner: true,
+        displayClock: "90'+4'",
+        period: 2,
+        shortDetail: "FT",
+        detail: "FT",
+        description: "Full Time",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+        },
+      },
+    },
+    liveMeta: {},
+    now,
+  });
+
+  assert.equal(patch["results/ko/m79/w"], "MEX");
+  assert.equal(patch["results/ko/m79/p"], "90");
+});
+
+test("fills knockout method as extra time for matches decided after extra time or penalties", () => {
+  const now = Date.parse("2026-07-01T22:45:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "MEX",
+        away: "CZE",
+        homeScore: "2",
+        awayScore: "2",
+        homeWinner: true,
+        awayWinner: false,
+        displayClock: "120'",
+        period: 5,
+        shortDetail: "FT-Pens",
+        detail: "FT-Pens",
+        description: "Final Score - After Penalties",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+        },
+      },
+    },
+    liveMeta: {},
+    now,
+  });
+
+  assert.equal(patch["results/ko/m79/score"], "2-2");
+  assert.equal(patch["results/ko/m79/w"], "MEX");
+  assert.equal(patch["results/ko/m79/p"], "et");
 });

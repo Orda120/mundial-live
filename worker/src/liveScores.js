@@ -91,18 +91,28 @@ export function shouldPoll({ schedule, now, lastPollAt }) {
 
 export function normalizeEspnEvent(event) {
   if (!event?.id || !event?.date) return null;
+  const competition = competitionOf(event);
+  const status = competition?.status || event?.status || {};
+  const statusType = status?.type || {};
   const { home, away } = competitorsOf(event);
   const homeCode = home?.team?.abbreviation;
   const awayCode = away?.team?.abbreviation;
   const homeScore = Number(home?.score);
   const awayScore = Number(away?.score);
-  const state = event?.status?.type?.state;
+  const state = statusType?.state;
   const displayClock =
-    event?.status?.displayClock ||
-    event?.status?.type?.shortDetail ||
-    event?.status?.type?.detail ||
-    event?.status?.type?.description ||
+    status?.displayClock ||
+    statusType?.shortDetail ||
+    statusType?.detail ||
+    statusType?.description ||
     "";
+  const period = Number(status?.period);
+  const statusText = [...new Set([
+    status?.displayClock,
+    statusType?.detail,
+    statusType?.shortDetail,
+    statusType?.description,
+  ].filter(Boolean))].join(" ");
 
   if (
     !homeCode ||
@@ -123,6 +133,8 @@ export function normalizeEspnEvent(event) {
     homeScore,
     awayScore,
     winner: home?.winner === true ? homeCode : away?.winner === true ? awayCode : null,
+    period: Number.isFinite(period) ? period : null,
+    statusText,
     status: state === "in" ? "live" : state === "post" ? "finished" : "scheduled",
     displayClock,
   };
@@ -168,6 +180,21 @@ function winnerInAppOrder(normalized, t1, t2) {
   if (normalized.status !== "finished" || normalized.homeScore === normalized.awayScore) return null;
   const winner = normalized.homeScore > normalized.awayScore ? normalized.home : normalized.away;
   return winner === t1 || winner === t2 ? winner : null;
+}
+
+function knockoutMethod(normalized) {
+  if (normalized.stage !== "knockout") return null;
+
+  const text = `${normalized.statusText || ""} ${normalized.displayClock || ""}`.toLowerCase();
+  if (
+    normalized.period > 2 ||
+    /^120(?:'|\+|$)/.test(normalized.displayClock || "") ||
+    /\baet\b|\bpens?\b|penalt|extra time|after penalties/.test(text)
+  ) {
+    return "et";
+  }
+
+  return normalized.status === "finished" ? "90" : null;
 }
 
 function writeLiveMeta(patch, fixtureId, normalized, now) {
@@ -251,6 +278,9 @@ export function buildFirebasePatch({
 
     const winner = winnerInAppOrder(normalized, match.t1, match.t2);
     if (winner) patch[`results/ko/${match.id}/w`] = winner;
+
+    const method = knockoutMethod(normalized);
+    if (method && !existingKo.p) patch[`results/ko/${match.id}/p`] = method;
 
     writeLiveMeta(patch, match.id, normalized, now);
   }
