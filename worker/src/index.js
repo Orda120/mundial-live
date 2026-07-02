@@ -62,13 +62,47 @@ function sameSecret(provided, expected) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+const SCORE_RE = /^(\d{1,2})-(\d{1,2})$/;
+
+function isDrawScore(score) {
+  const match = typeof score === "string" && SCORE_RE.exec(score);
+  return Boolean(match && Number(match[1]) === Number(match[2]));
+}
+
+function metaSuggestsExtraTime(meta) {
+  const text = [
+    meta?.displayClock,
+    meta?.detail,
+    meta?.shortDetail,
+    meta?.description,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return /^120(?:'|\+|$)/.test(meta?.displayClock || "") ||
+    /\baet\b|\bpens?\b|penalt|extra time|after penalties/.test(text);
+}
+
+function needsKnockoutMethodBackfill(koResults, liveMeta) {
+  return Object.entries(koResults || {}).some(([id, match]) => {
+    if (!match?.w || !match?.t1 || !match?.t2) return false;
+    if (!match.p) return true;
+    return match.p === "90" && (
+      isDrawScore(match.score) ||
+      metaSuggestsExtraTime((liveMeta || {})[id])
+    );
+  });
+}
+
 export async function syncLiveScores(env, { now = Date.now(), dryRun = false } = {}) {
   const syncState = (await readFirebase(env, "liveSync")) || {};
   let schedule = syncState.schedule || {};
   let events = null;
   let refreshedSchedule = false;
+  const [koResults, liveMeta] = await Promise.all([
+    readFirebase(env, "results/ko"),
+    readFirebase(env, "liveMeta/g"),
+  ]);
+  const needsMethodBackfill = needsKnockoutMethodBackfill(koResults || {}, liveMeta || {});
 
-  if (shouldRefreshSchedule(syncState.lastScheduleAt, now, schedule)) {
+  if (shouldRefreshSchedule(syncState.lastScheduleAt, now, schedule) || needsMethodBackfill) {
     events = await fetchEspn(FULL_SCHEDULE_DATES);
     schedule = extractSchedule(events);
     refreshedSchedule = true;
@@ -80,11 +114,7 @@ export async function syncLiveScores(env, { now = Date.now(), dryRun = false } =
     return { status: "idle", scheduleSize: Object.keys(schedule).length, writes: 0 };
   }
 
-  const [groupResults, koResults, liveMeta] = await Promise.all([
-    readFirebase(env, "results/g"),
-    readFirebase(env, "results/ko"),
-    readFirebase(env, "liveMeta/g"),
-  ]);
+  const groupResults = await readFirebase(env, "results/g");
   const scorePatch = buildFirebasePatch({
     events,
     existingResults: {
@@ -115,7 +145,7 @@ export async function syncLiveScores(env, { now = Date.now(), dryRun = false } =
     status: dryRun ? "dry-run" : "synced",
     scheduleSize: Object.keys(schedule).length,
     writes: Object.keys(scorePatch).filter((key) =>
-      key.startsWith("results/g/") || /^results\/ko\/[^/]+\/score$/.test(key)
+      key.startsWith("results/g/") || /^results\/ko\/[^/]+\/(?:score|p)$/.test(key)
     ).length,
   };
 }
