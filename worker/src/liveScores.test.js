@@ -420,6 +420,160 @@ test("protects an existing knockout score without metadata as a manual override"
   });
 });
 
+test("fills a missing knockout method even when an existing score is protected as manual", () => {
+  const now = Date.parse("2026-07-01T22:45:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "MEX",
+        away: "CZE",
+        homeScore: "2",
+        awayScore: "2",
+        homeWinner: true,
+        displayClock: "120'",
+        period: 5,
+        shortDetail: "FT-Pens",
+        detail: "FT-Pens",
+        description: "Final Score - After Penalties",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+          score: "2-2",
+          w: "MEX",
+        },
+      },
+    },
+    liveMeta: {},
+    now,
+  });
+
+  assert.equal("results/ko/m79/score" in patch, false);
+  assert.equal("results/ko/m79/w" in patch, false);
+  assert.equal(patch["results/ko/m79/p"], "et");
+  assert.deepEqual(patch["liveMeta/g/m79"], {
+    source: "manual",
+    status: "manual",
+    updatedAt: now,
+    manualOverride: true,
+  });
+});
+
+test("corrects an automatic knockout method when ESPN later clarifies extra time", () => {
+  const now = Date.parse("2026-07-01T22:45:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "MEX",
+        away: "CZE",
+        homeScore: "2",
+        awayScore: "2",
+        homeWinner: true,
+        displayClock: "120'",
+        period: 5,
+        shortDetail: "FT-Pens",
+        detail: "FT-Pens",
+        description: "Final Score - After Penalties",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+          score: "2-2",
+          w: "MEX",
+          p: "90",
+        },
+      },
+    },
+    liveMeta: {
+      m79: {
+        source: "espn",
+        status: "finished",
+        providerFixtureId: "900001",
+        kickoff: "2026-07-01T20:00:00Z",
+        displayClock: "FT",
+        updatedAt: now - 1,
+        manualOverride: false,
+      },
+    },
+    now,
+  });
+
+  assert.equal(patch["results/ko/m79/p"], "et");
+  assert.equal(patch["liveMeta/g/m79"].source, "espn");
+});
+
+test("does not overwrite a manually entered knockout method", () => {
+  const now = Date.parse("2026-07-01T22:45:00Z");
+  const patch = buildFirebasePatch({
+    events: [
+      espnEvent({
+        id: "900001",
+        date: "2026-07-01T20:00:00Z",
+        state: "post",
+        type: "round-of-32",
+        home: "MEX",
+        away: "CZE",
+        homeScore: "2",
+        awayScore: "2",
+        homeWinner: true,
+        displayClock: "120'",
+        period: 5,
+        shortDetail: "FT-Pens",
+        detail: "FT-Pens",
+        description: "Final Score - After Penalties",
+      }),
+    ],
+    existingResults: {
+      g: {},
+      ko: {
+        m79: {
+          round: "r32",
+          matchNo: 79,
+          scheduled: true,
+          t1: "MEX",
+          t2: "CZE",
+          score: "2-2",
+          w: "MEX",
+          p: "90",
+        },
+      },
+    },
+    liveMeta: {
+      m79: {
+        source: "manual",
+        status: "manual",
+        manualOverride: true,
+        updatedAt: now - 1,
+      },
+    },
+    now,
+  });
+
+  assert.equal("results/ko/m79/p" in patch, false);
+});
+
 test("fills knockout method as regulation for finished matches that did not reach extra time", () => {
   const now = Date.parse("2026-07-01T22:00:00Z");
   const patch = buildFirebasePatch({

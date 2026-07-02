@@ -213,6 +213,13 @@ function hasManualKnockoutScore(existingKo) {
   return existingKo.score != null;
 }
 
+function shouldWriteKnockoutMethod({ method, existingKo, meta }) {
+  if (!method) return false;
+  if (!existingKo.p) return true;
+  if (meta?.manualOverride) return false;
+  return meta?.source === "espn" && existingKo.p !== method;
+}
+
 export function buildFirebasePatch({
   events,
   existingResults = {},
@@ -253,10 +260,21 @@ export function buildFirebasePatch({
     if (!match) continue;
 
     const existingKo = results.ko[match.id] || {};
+    const meta = liveMeta[match.id];
     const manualKoScore = hasManualKnockoutScore(existingKo);
-    if (liveMeta[match.id]?.manualOverride && manualKoScore) continue;
+    const method = knockoutMethod(normalized);
 
-    if (manualKoScore && !liveMeta[match.id]) {
+    if (meta?.manualOverride && manualKoScore) {
+      if (shouldWriteKnockoutMethod({ method, existingKo, meta })) {
+        patch[`results/ko/${match.id}/p`] = method;
+      }
+      continue;
+    }
+
+    if (manualKoScore && !meta) {
+      if (shouldWriteKnockoutMethod({ method, existingKo, meta })) {
+        patch[`results/ko/${match.id}/p`] = method;
+      }
       patch[`liveMeta/g/${match.id}`] = {
         source: "manual",
         status: "manual",
@@ -279,8 +297,9 @@ export function buildFirebasePatch({
     const winner = winnerInAppOrder(normalized, match.t1, match.t2);
     if (winner) patch[`results/ko/${match.id}/w`] = winner;
 
-    const method = knockoutMethod(normalized);
-    if (method && !existingKo.p) patch[`results/ko/${match.id}/p`] = method;
+    if (shouldWriteKnockoutMethod({ method, existingKo, meta })) {
+      patch[`results/ko/${match.id}/p`] = method;
+    }
 
     writeLiveMeta(patch, match.id, normalized, now);
   }
